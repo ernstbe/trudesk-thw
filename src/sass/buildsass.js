@@ -14,7 +14,7 @@
 
 var _ = require('lodash')
 var path = require('path')
-var sass = require('node-sass')
+var sass = require('sass')
 var settingUtil = require('../settings/settingsUtil')
 
 var buildsass = {}
@@ -42,14 +42,24 @@ function sassImport (path) {
 }
 
 function dynamicSass (entry, vars, success, error) {
-  var dataString = sassVariables(vars) + sassImport(entry)
-  var sassOptions = _.assign({}, sassOptionsDefaults, {
-    data: dataString
-  })
+  try {
+    var dataString = sassVariables(vars) + sassImport(entry)
+    var sassOptions = _.assign({}, sassOptionsDefaults, {
+      data: dataString,
+      indentedSyntax: true
+    })
 
-  sass.render(sassOptions, function (err, result) {
-    return err ? error(err) : success(result.css.toString())
-  })
+    // Use synchronous API from dart-sass
+    var result = sass.compileString(dataString, {
+      style: sassOptions.outputStyle === 'compressed' ? 'compressed' : 'expanded',
+      loadPaths: sassOptions.includePaths,
+      quiet: true
+    })
+
+    return success(result.css.toString())
+  } catch (err) {
+    return error(err)
+  }
 }
 
 function save (result) {
