@@ -118,7 +118,7 @@ class CreateTicketModal extends React.Component {
     if (this.issueText.length < minIssueLength) {
       $errorBorderWrap.css({ border: '1px solid #E74C3C' })
       const mdeError = $(
-        `<div class="mde-error uk-float-left uk-text-left">Please enter a valid issue. Issue must contain at least ${minIssueLength} characters</div>`
+        `<div class="mde-error uk-float-left uk-text-left">${this.props.t('modals.createTicket.validIssue', { min: minIssueLength })}</div>`
       )
       $mdeError = $issueTextbox.siblings('.editor-statusbar').find('.mde-error')
       if ($mdeError.length < 1) $issueTextbox.siblings('.editor-statusbar').prepend(mdeError)
