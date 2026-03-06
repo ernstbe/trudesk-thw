@@ -179,6 +179,8 @@ function launchServer (db) {
 
       await promisify(require('./src/migration').run)
 
+      await require('./src/seeder').init()
+
       winston.debug('Building dynamic sass...')
       await promisify(require('./src/sass/buildsass').build)
 
