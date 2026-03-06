@@ -13,7 +13,7 @@
  */
 
 var winston = require('winston')
-var request = require('request')
+var axios = require('axios')
 
 module.exports.pushNotification = function (tpsUsername, tpsApiKey, notification) {
   var body = {
@@ -33,23 +33,18 @@ module.exports.pushNotification = function (tpsUsername, tpsApiKey, notification
     body.data.ticketUid = notification.data.ticketUid
   }
 
-  request(
-    {
-      url: 'http://push.trudesk.io/api/pushNotification',
-      method: 'POST',
+  axios
+    .post('http://push.trudesk.io/api/pushNotification', body, {
       headers: {
         'Content-Type': 'application/json',
         accesstoken: tpsApiKey
-      },
-      body: JSON.stringify(body)
-    },
-    function (err, response) {
-      if (err) {
-        winston.debug(err)
+      }
+    })
+    .catch(function (err) {
+      if (err.response && err.response.status === 401) {
+        winston.warn('[trudesk:TPS:pushNotification] Error - Invalid API Key and or Username.')
       } else {
-        if (response.statusCode === 401) {
-          winston.warn('[trudesk:TPS:pushNotification] Error - Invalid API Key and or Username.')
-        }
+        winston.debug(err)
       }
     }
   )

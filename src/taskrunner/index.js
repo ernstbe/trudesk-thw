@@ -11,7 +11,7 @@
 
 const _ = require('lodash')
 const async = require('async')
-const request = require('request')
+const axios = require('axios')
 const ticketSchema = require('../models/ticket')
 const userSchema = require('../models/user')
 const groupSchema = require('../models/group')
@@ -101,24 +101,23 @@ taskRunner.sendStats = function (callback) {
         // if (typeof callback === 'function') return callback()
         // return
         if (err) return callback()
-        request(
-          'https://stats.trudesk.app/api/v1/installation',
-          {
-            method: 'POST',
-            json: true,
-            body: {
-              statsKey: 'trudesk',
-              id: installIdSetting.value,
-              version: versionSetting.value,
-              hostname: hostnameSetting.value,
-              ticketCount: result.ticketCount,
-              agentCount: result.agentCount,
-              customerGroupCount: result.customerGroupCount,
-              conversationCount: result.conversationCount
-            }
-          },
-          callback
-        )
+        axios
+          .post('https://stats.trudesk.app/api/v1/installation', {
+            statsKey: 'trudesk',
+            id: installIdSetting.value,
+            version: versionSetting.value,
+            hostname: hostnameSetting.value,
+            ticketCount: result.ticketCount,
+            agentCount: result.agentCount,
+            customerGroupCount: result.customerGroupCount,
+            conversationCount: result.conversationCount
+          })
+          .then(function () {
+            callback()
+          })
+          .catch(function () {
+            callback()
+          })
       }
     )
   })
