@@ -1,12 +1,12 @@
 /* eslint-disable no-unused-expressions */
-var expect = require('chai').expect
-var superagent = require('superagent')
-var m = require('mongoose')
+const expect = require('chai').expect
+const superagent = require('superagent')
+const m = require('mongoose')
 
 describe('api/recurringTasks.js', function () {
-  var agent = superagent.agent()
-  var createdTaskId
-  var baseUrl = 'http://localhost:3111'
+  const agent = superagent.agent()
+  let createdTaskId
+  const baseUrl = 'http://localhost:3111'
 
   before(function (done) {
     agent
@@ -79,7 +79,7 @@ describe('api/recurringTasks.js', function () {
   it('should return 404 for non-existent task', function (done) {
     agent
       .get(baseUrl + '/api/v2/recurring-tasks/000000000000000000000000')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.equal(404)
         expect(res.body.success).to.be.false
         done()
@@ -131,10 +131,10 @@ describe('api/recurringTasks.js', function () {
   })
 
   it('should reject unauthenticated requests', function (done) {
-    var unauthAgent = superagent.agent()
+    const unauthAgent = superagent.agent()
     unauthAgent
       .get(baseUrl + '/api/v2/recurring-tasks')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.not.equal(200)
         done()
       })

@@ -1,13 +1,13 @@
 /* eslint-disable no-unused-expressions */
-var expect = require('chai').expect
-var m = require('mongoose')
-var recurringTaskSchema = require('../../src/models/recurringTask')
+const expect = require('chai').expect
+const m = require('mongoose')
+const recurringTaskSchema = require('../../src/models/recurringTask')
 
 describe('recurringTask.js', function () {
-  var testTaskId
+  let testTaskId
 
   it('should create a monthly recurring task', async function () {
-    var task = await recurringTaskSchema.create({
+    const task = await recurringTaskSchema.create({
       name: 'Monatliche Sicherheitspruefung',
       description: 'Sicherheitsbegehung der Liegenschaft',
       ticketSubject: 'Sicherheitspruefung faellig',
@@ -30,7 +30,7 @@ describe('recurringTask.js', function () {
   })
 
   it('should create a quarterly recurring task', async function () {
-    var task = await recurringTaskSchema.create({
+    const task = await recurringTaskSchema.create({
       name: 'Quartalsbericht',
       ticketSubject: 'Quartalsbericht erstellen',
       ticketIssue: 'Bitte Quartalsbericht anfertigen',
@@ -48,7 +48,7 @@ describe('recurringTask.js', function () {
   })
 
   it('should create an annual recurring task', async function () {
-    var task = await recurringTaskSchema.create({
+    const task = await recurringTaskSchema.create({
       name: 'Jahrespruefung UVV',
       ticketSubject: 'UVV Pruefung faellig',
       ticketIssue: 'Jaehrliche UVV-Pruefung durchfuehren',
@@ -67,61 +67,61 @@ describe('recurringTask.js', function () {
   })
 
   it('should get all recurring tasks', async function () {
-    var tasks = await recurringTaskSchema.getAll()
+    const tasks = await recurringTaskSchema.getAll()
     expect(tasks).to.be.a('array')
     expect(tasks).to.have.length(3)
   })
 
   it('should get task by id', async function () {
-    var task = await recurringTaskSchema.getById(testTaskId)
+    const task = await recurringTaskSchema.getById(testTaskId)
     expect(task).to.be.a('object')
     expect(task.name).to.equal('Monatliche Sicherheitspruefung')
   })
 
   it('should get only enabled tasks', async function () {
-    var tasks = await recurringTaskSchema.getEnabled()
+    const tasks = await recurringTaskSchema.getEnabled()
     expect(tasks).to.be.a('array')
     expect(tasks).to.have.length(3)
   })
 
   it('should disable a task and exclude it from enabled list', async function () {
-    var task = await recurringTaskSchema.findById(testTaskId)
+    const task = await recurringTaskSchema.findById(testTaskId)
     task.enabled = false
     await task.save()
 
-    var enabledTasks = await recurringTaskSchema.getEnabled()
+    const enabledTasks = await recurringTaskSchema.getEnabled()
     expect(enabledTasks).to.have.length(2)
   })
 
   it('should calculate next run correctly', function () {
-    var task = {
+    const task = {
       scheduleType: 'monthly',
       dayOfMonth: 15,
       daysBeforeDeadline: 7
     }
 
-    var nextRun = recurringTaskSchema.calculateNextRun(task)
+    const nextRun = recurringTaskSchema.calculateNextRun(task)
     expect(nextRun).to.be.a('date')
     expect(nextRun).to.be.above(new Date())
   })
 
   it('should calculate next run for quarterly', function () {
-    var task = {
+    const task = {
       scheduleType: 'quarterly',
       dayOfMonth: 1,
       daysBeforeDeadline: 14
     }
 
-    var nextRun = recurringTaskSchema.calculateNextRun(task)
+    const nextRun = recurringTaskSchema.calculateNextRun(task)
     expect(nextRun).to.be.a('date')
     expect(nextRun).to.be.above(new Date())
   })
 
   it('should update updatedAt on save', async function () {
-    var task = await recurringTaskSchema.findById(testTaskId)
-    var oldUpdated = task.updatedAt
+    const task = await recurringTaskSchema.findById(testTaskId)
+    const oldUpdated = task.updatedAt
     task.name = 'Updated Name'
-    var saved = await task.save()
+    const saved = await task.save()
     expect(saved.updatedAt).to.exist
     if (oldUpdated) {
       expect(saved.updatedAt.getTime()).to.be.at.least(oldUpdated.getTime())

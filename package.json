@@ -190,6 +190,7 @@
     "prettier-standard": "16.4.1",
     "sass-loader": "16.0.7",
     "semantic-release": "19.0.3",
+    "snazzy": "^9.0.0",
     "standard": "17.1.2",
     "style-loader": "4.0.0",
     "superagent": "8.0.0",
@@ -269,7 +270,8 @@
       "/public/",
       "/mobile/",
       "/src/public/js/plugins/",
-      "/src/public/js/vendor/"
+      "/src/public/js/vendor/",
+      "/src/client/components/OffCanvasEditor/"
     ],
     "globals": [
       "define",
@@ -278,7 +280,13 @@
       "ROLES",
       "io",
       "d3",
-      "History"
+      "History",
+      "localStorage",
+      "location"
+    ],
+    "env": [
+      "mocha",
+      "browser"
     ]
   },
   "prettier": {

@@ -5937,6 +5937,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"concat-stream@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "concat-stream@npm:2.0.0"
+  dependencies:
+    buffer-from: ^1.0.0
+    inherits: ^2.0.3
+    readable-stream: ^3.0.2
+    typedarray: ^0.0.6
+  checksum: d7f75d48f0ecd356c1545d87e22f57b488172811b1181d96021c7c4b14ab8855f5313280263dca44bb06e5222f274d047da3e290a38841ef87b59719bde967c7
+  languageName: node
+  linkType: hard
+
 "config-chain@npm:^1.1.11, config-chain@npm:^1.1.13":
   version: 1.1.13
   resolution: "config-chain@npm:1.1.13"
@@ -17873,7 +17885,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"readable-stream@npm:3, readable-stream@npm:^3.0.0, readable-stream@npm:^3.1.1, readable-stream@npm:^3.4.0, readable-stream@npm:^3.6.0, readable-stream@npm:^3.6.2":
+"readable-stream@npm:3, readable-stream@npm:^3.0.0, readable-stream@npm:^3.0.2, readable-stream@npm:^3.1.1, readable-stream@npm:^3.4.0, readable-stream@npm:^3.6.0, readable-stream@npm:^3.6.2":
   version: 3.6.2
   resolution: "readable-stream@npm:3.6.2"
   dependencies:
@@ -19356,6 +19368,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"snazzy@npm:^9.0.0":
+  version: 9.0.0
+  resolution: "snazzy@npm:9.0.0"
+  dependencies:
+    chalk: ^4.1.0
+    inherits: ^2.0.4
+    minimist: ^1.2.5
+    readable-stream: ^3.6.0
+    standard-json: ^1.1.0
+    strip-ansi: ^6.0.0
+    text-table: ^0.2.0
+  bin:
+    snazzy: bin/cmd.js
+  checksum: 4861448e2114402e3e167defee4127dfd8c77a0e5f08b61f2c35711fc5c9a89093482b5b9f9e1f043639e96277acbe9fa55e8bdf17f5c9a09de1b7f021043802
+  languageName: node
+  linkType: hard
+
 "socket.io-adapter@npm:~2.5.2":
   version: 2.5.6
   resolution: "socket.io-adapter@npm:2.5.6"
@@ -19677,6 +19706,17 @@ __metadata:
     pkg-conf: ^3.1.0
     xdg-basedir: ^4.0.0
   checksum: cd530a9711778b6d8c15f66cc12c4fb9583df7a641a523eb84acb9f706674d97fe33bc89d57e621aeea9e2e1f91fa44aca235f76e661b91eaf2b5911d6b2cb23
+  languageName: node
+  linkType: hard
+
+"standard-json@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "standard-json@npm:1.1.0"
+  dependencies:
+    concat-stream: ^2.0.0
+  bin:
+    standard-json: ./bin.js
+  checksum: 34ff81ee932b9e41d471f16e0a7fbfd6458ae7a000e71458f1872e83c61b84e90f36b743ef1439be8c363757ef068ddd7089965cb586b138c2969cf1a9e6a4f6
   languageName: node
   linkType: hard
 
@@ -20965,6 +21005,7 @@ __metadata:
     semantic-release: 19.0.3
     semver: 7.7.4
     serve-favicon: 2.5.1
+    snazzy: ^9.0.0
     socket.io: 4.8.3
     socket.io-client: 4.8.3
     standard: 17.1.2
@@ -21199,6 +21240,13 @@ __metadata:
   dependencies:
     is-typedarray: ^1.0.0
   checksum: 99c11aaa8f45189fcfba6b8a4825fd684a321caa9bd7a76a27cf0c7732c174d198b99f449c52c3818107430b5f41c0ccbbfb75cb2ee3ca4a9451710986d61a60
+  languageName: node
+  linkType: hard
+
+"typedarray@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "typedarray@npm:0.0.6"
+  checksum: 33b39f3d0e8463985eeaeeacc3cb2e28bc3dfaf2a5ed219628c0b629d5d7b810b0eb2165f9f607c34871d5daa92ba1dc69f49051cf7d578b4cbd26c340b9d1b1
   languageName: node
   linkType: hard
 

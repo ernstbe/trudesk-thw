@@ -1,11 +1,11 @@
 /* eslint-disable no-unused-expressions */
-var expect = require('chai').expect
-var superagent = require('superagent')
+const expect = require('chai').expect
+const superagent = require('superagent')
 
 describe('api/reports.js', function () {
-  var agent = superagent.agent()
-  var testGroupId
-  var baseUrl = 'http://localhost:3111'
+  const agent = superagent.agent()
+  let testGroupId
+  const baseUrl = 'http://localhost:3111'
 
   before(async function () {
     await new Promise(function (resolve, reject) {
@@ -22,8 +22,8 @@ describe('api/reports.js', function () {
         })
     })
 
-    var groupSchema = require('../../src/models/group')
-    var group = await groupSchema.getGroupByName('TEST')
+    const groupSchema = require('../../src/models/group')
+    const group = await groupSchema.getGroupByName('TEST')
     testGroupId = group._id.toString()
   })
 
@@ -57,7 +57,7 @@ describe('api/reports.js', function () {
   it('should return 400 without groupId', function (done) {
     agent
       .get(baseUrl + '/api/v2/reports/handover')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.equal(400)
         expect(res.body.success).to.be.false
         done()
@@ -67,7 +67,7 @@ describe('api/reports.js', function () {
   it('should return 404 for non-existent group', function (done) {
     agent
       .get(baseUrl + '/api/v2/reports/handover?groupId=000000000000000000000000')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.equal(404)
         expect(res.body.success).to.be.false
         done()
@@ -76,7 +76,7 @@ describe('api/reports.js', function () {
 
   // Sitzungs Report
   it('should get sitzung report as JSON', function (done) {
-    var since = new Date()
+    const since = new Date()
     since.setDate(since.getDate() - 30)
 
     agent
@@ -95,7 +95,7 @@ describe('api/reports.js', function () {
   })
 
   it('should get sitzung report as markdown', function (done) {
-    var since = new Date()
+    const since = new Date()
     since.setDate(since.getDate() - 30)
 
     agent
@@ -114,7 +114,7 @@ describe('api/reports.js', function () {
   it('should return 400 without since parameter', function (done) {
     agent
       .get(baseUrl + '/api/v2/reports/sitzung')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.equal(400)
         expect(res.body.success).to.be.false
         done()
@@ -124,7 +124,7 @@ describe('api/reports.js', function () {
   it('should return 400 for invalid date', function (done) {
     agent
       .get(baseUrl + '/api/v2/reports/sitzung?since=not-a-date')
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.equal(400)
         expect(res.body.success).to.be.false
         done()
@@ -132,10 +132,10 @@ describe('api/reports.js', function () {
   })
 
   it('should reject unauthenticated requests', function (done) {
-    var unauthAgent = superagent.agent()
+    const unauthAgent = superagent.agent()
     unauthAgent
       .get(baseUrl + '/api/v2/reports/handover?groupId=' + testGroupId)
-      .end(function (err, res) {
+      .end(function (_err, res) {
         expect(res.status).to.not.equal(200)
         done()
       })

@@ -102,12 +102,12 @@ const eventTicketCreated = require('./events/event_ticket_created')
     }
 
     const n = {
-      title: title,
+      title,
       data: {
         ticketId: ticket._id,
         ticketUid: ticket.uid,
-        users: users,
-        hostname: hostname
+        users,
+        hostname
       }
     }
 
@@ -119,7 +119,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
   }
 
   emitter.on('ticket:updated', function (ticket) {
-    io.sockets.emit('$trudesk:client:ticket:updated', { ticket: ticket })
+    io.sockets.emit('$trudesk:client:ticket:updated', { ticket })
   })
 
   emitter.on('ticket:deleted', function (oId) {
@@ -168,7 +168,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
             title: 'Comment Added to Ticket#' + ticket.uid,
             message: ticket.subject,
             type: 1,
-            data: { ticket: ticket },
+            data: { ticket },
             unread: true
           })
 
@@ -185,7 +185,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
               title: 'Comment Added to Ticket#' + ticket.uid,
               message: ticket.subject,
               type: 2,
-              data: { ticket: ticket },
+              data: { ticket },
               unread: true
             })
 
@@ -197,12 +197,12 @@ const eventTicketCreated = require('./events/event_ticket_created')
       // Push notification
       sendPushNotification(
         {
-          tpsEnabled: tpsEnabled,
-          tpsUsername: tpsUsername,
-          tpsApiKey: tpsApiKey,
-          hostname: hostname
+          tpsEnabled,
+          tpsUsername,
+          tpsApiKey,
+          hostname
         },
-        { type: 2, ticket: ticket }
+        { type: 2, ticket }
       )
 
       await Promise.all(notificationPromises)
@@ -238,13 +238,13 @@ const eventTicketCreated = require('./events/event_ticket_created')
 
             const html = await email.render('ticket-comment-added', {
               ticket: ticketJSON,
-              comment: comment
+              comment
             })
 
             const mailOptions = {
               to: emails.join(),
               subject: require('../i18n').t('ticketUpdated', { uid: ticketJSON.uid, subject: ticketJSON.subject }),
-              html: html,
+              html,
               generateTextFromHTML: true
             }
 

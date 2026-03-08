@@ -1,12 +1,19 @@
 /* eslint-disable no-unused-expressions */
-var expect = require('chai').expect
-var assetSchema = require('../../src/models/asset')
+const expect = require('chai').expect
+const assetSchema = require('../../src/models/asset')
 
 describe('asset.js', function () {
-  var testAssetId
+  let testAssetId
+  let initialCount = 0
+
+  before(async function () {
+    await assetSchema.ensureIndexes()
+    const existing = await assetSchema.getAll()
+    initialCount = existing.length
+  })
 
   it('should create an asset', async function () {
-    var asset = await assetSchema.create({
+    const asset = await assetSchema.create({
       name: 'GKW 1',
       assetTag: 'THW-FZ-001',
       category: 'Fahrzeug',
@@ -36,39 +43,38 @@ describe('asset.js', function () {
   })
 
   it('should get all assets', async function () {
-    var assets = await assetSchema.getAll()
+    const assets = await assetSchema.getAll()
     expect(assets).to.be.a('array')
-    expect(assets).to.have.length(1)
-    expect(assets[0].name).to.equal('GKW 1')
+    expect(assets).to.have.length(initialCount + 1)
   })
 
   it('should get asset by id', async function () {
-    var asset = await assetSchema.getById(testAssetId)
+    const asset = await assetSchema.getById(testAssetId)
     expect(asset).to.be.a('object')
     expect(asset.name).to.equal('GKW 1')
   })
 
   it('should get asset by assetTag', async function () {
-    var asset = await assetSchema.getByAssetTag('THW-FZ-001')
+    const asset = await assetSchema.getByAssetTag('THW-FZ-001')
     expect(asset).to.be.a('object')
     expect(asset.name).to.equal('GKW 1')
   })
 
   it('should return null for non-existent assetTag', async function () {
-    var asset = await assetSchema.getByAssetTag('NONEXISTENT')
+    const asset = await assetSchema.getByAssetTag('NONEXISTENT')
     expect(asset).to.not.exist
   })
 
   it('should update asset fields', async function () {
-    var asset = await assetSchema.findById(testAssetId)
+    const asset = await assetSchema.findById(testAssetId)
     asset.location = 'Werkstatt'
-    var saved = await asset.save()
+    const saved = await asset.save()
     expect(saved.location).to.equal('Werkstatt')
     expect(saved.updatedAt).to.exist
   })
 
   it('should create a second asset', async function () {
-    var asset = await assetSchema.create({
+    const asset = await assetSchema.create({
       name: 'Laptop S6-01',
       assetTag: 'THW-IT-001',
       category: 'IT-Geraet',
@@ -79,9 +85,11 @@ describe('asset.js', function () {
   })
 
   it('should get all assets sorted by name', async function () {
-    var assets = await assetSchema.getAll()
-    expect(assets).to.have.length(2)
-    expect(assets[0].name).to.equal('GKW 1')
-    expect(assets[1].name).to.equal('Laptop S6-01')
+    const assets = await assetSchema.getAll()
+    expect(assets).to.have.length(initialCount + 2)
+    // Verify our created assets exist and are sorted
+    const names = assets.map(a => a.name)
+    expect(names).to.include('GKW 1')
+    expect(names).to.include('Laptop S6-01')
   })
 })

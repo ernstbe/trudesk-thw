@@ -195,7 +195,7 @@ ticketsV2.updateMetadata = async function (req, res) {
   const metadata = req.body.metadata
   if (!uid || !metadata || !_.isObject(metadata)) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
 
-  var allowedFields = ['estimatedCost', 'actualCost', 'vendor', 'orderNumber', 'approvedBy', 'approvalDate']
+  const allowedFields = ['estimatedCost', 'actualCost', 'vendor', 'orderNumber', 'approvedBy', 'approvalDate']
 
   try {
     const ticket = await Models.Ticket.getTicketByUid(uid)
@@ -203,8 +203,8 @@ ticketsV2.updateMetadata = async function (req, res) {
 
     if (!ticket.metadata) ticket.metadata = {}
 
-    for (var i = 0; i < allowedFields.length; i++) {
-      var field = allowedFields[i]
+    for (let i = 0; i < allowedFields.length; i++) {
+      const field = allowedFields[i]
       if (!_.isUndefined(metadata[field])) {
         ticket.metadata[field] = metadata[field]
       }
@@ -213,7 +213,7 @@ ticketsV2.updateMetadata = async function (req, res) {
     ticket.markModified('metadata')
     ticket.updated = new Date()
 
-    var historyItem = {
+    const historyItem = {
       action: 'ticket:update:metadata',
       description: 'Ticket metadata was updated',
       owner: req.user._id
@@ -222,7 +222,7 @@ ticketsV2.updateMetadata = async function (req, res) {
 
     await ticket.save()
 
-    return apiUtils.sendApiSuccess(res, { ticket: ticket })
+    return apiUtils.sendApiSuccess(res, { ticket })
   } catch (err) {
     return apiUtils.sendApiError(res, 500, err.message)
   }
