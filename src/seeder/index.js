@@ -73,9 +73,10 @@ seeder.init = async function (callback) {
       winston.info('Seeder: Finished — created 7 groups, 6 teams, 6 departments')
     }
 
-    // Seed ticket types and tags (idempotent — skips if they already exist)
+    // Seed ticket types, tags, and statuses (idempotent — skips if they already exist)
     await seedTicketTypes()
     await seedTags()
+    await seedProcurementStatuses()
   } catch (err) {
     winston.warn('Seeder: Error during seeding — ' + err.message)
   }
@@ -114,6 +115,27 @@ async function seedTags () {
     if (count === 0) {
       await TagSchema.create({ name: thwTags[i] })
       winston.debug('Seeder: Created tag "' + thwTags[i] + '"')
+    }
+  }
+}
+
+async function seedProcurementStatuses () {
+  var StatusSchema = require('../models/ticketStatus')
+
+  var procurementStatuses = [
+    { name: 'Antrag', htmlColor: '#FF9800', order: 10, slatimer: true, isResolved: false },
+    { name: 'Genehmigt', htmlColor: '#4CAF50', order: 11, slatimer: true, isResolved: false },
+    { name: 'Bestellt', htmlColor: '#2196F3', order: 12, slatimer: true, isResolved: false },
+    { name: 'Geliefert', htmlColor: '#8BC34A', order: 13, slatimer: false, isResolved: true },
+    { name: 'Abgelehnt', htmlColor: '#F44336', order: 14, slatimer: false, isResolved: true }
+  ]
+
+  for (var i = 0; i < procurementStatuses.length; i++) {
+    var s = procurementStatuses[i]
+    var existing = await StatusSchema.findOne({ name: s.name })
+    if (!existing) {
+      await StatusSchema.create(s)
+      winston.debug('Seeder: Created status "' + s.name + '"')
     }
   }
 }

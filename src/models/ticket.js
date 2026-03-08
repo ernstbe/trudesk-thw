@@ -108,6 +108,7 @@ const ticketSchema = mongoose.Schema({
   issue: { type: String, required: true },
   closedDate: { type: Date },
   dueDate: { type: Date },
+  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   comments: [commentSchema],
   notes: [noteSchema],
   attachments: [attachmentSchema],

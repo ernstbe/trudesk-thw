@@ -190,6 +190,44 @@ ticketsV2.batchUpdate = async function (req, res) {
   }
 }
 
+ticketsV2.updateMetadata = async function (req, res) {
+  const uid = req.params.uid
+  const metadata = req.body.metadata
+  if (!uid || !metadata || !_.isObject(metadata)) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
+
+  var allowedFields = ['estimatedCost', 'actualCost', 'vendor', 'orderNumber', 'approvedBy', 'approvalDate']
+
+  try {
+    const ticket = await Models.Ticket.getTicketByUid(uid)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    if (!ticket.metadata) ticket.metadata = {}
+
+    for (var i = 0; i < allowedFields.length; i++) {
+      var field = allowedFields[i]
+      if (!_.isUndefined(metadata[field])) {
+        ticket.metadata[field] = metadata[field]
+      }
+    }
+
+    ticket.markModified('metadata')
+    ticket.updated = new Date()
+
+    var historyItem = {
+      action: 'ticket:update:metadata',
+      description: 'Ticket metadata was updated',
+      owner: req.user._id
+    }
+    ticket.history.push(historyItem)
+
+    await ticket.save()
+
+    return apiUtils.sendApiSuccess(res, { ticket: ticket })
+  } catch (err) {
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
+}
+
 ticketsV2.delete = async function (req, res) {
   const uid = req.params.uid
   if (!uid) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
