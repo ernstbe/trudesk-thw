@@ -56,5 +56,9 @@ apiController.v2.messages = require('./api/v2/messages')
 apiController.v2.recurringTasks = require('./api/v2/recurringTasks')
 apiController.v2.assets = require('./api/v2/assets')
 apiController.v2.reports = require('./api/v2/reports')
+apiController.v2.ticketTemplates = require('./api/v2/ticketTemplates')
+apiController.v2.calendar = require('./api/v2/calendar')
+apiController.v2.dashboard = require('./api/v2/dashboard')
+apiController.v2.documents = require('./api/v2/documents')
 
 module.exports = apiController

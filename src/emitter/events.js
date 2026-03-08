@@ -22,6 +22,8 @@ const Email = require('email-templates')
 const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
 const socketEvents = require('../socketio/socketEventConsts')
 const notifications = require('../notifications') // Load Push Events
+const { parseMentions } = require('../helpers/mentionParser')
+const UserSchema = require('../models/user')
 
 const eventTicketCreated = require('./events/event_ticket_created')
 
@@ -191,6 +193,36 @@ const eventTicketCreated = require('./events/event_ticket_created')
 
             notificationPromises.push(notification.save())
           }
+        }
+      }
+
+      // Mention notifications
+      const commentText = comment.comment || ''
+      const mentionedUsernames = parseMentions(commentText)
+      for (const username of mentionedUsernames) {
+        try {
+          const mentionedUser = await UserSchema.getUserByUsername(username)
+          if (!mentionedUser) continue
+          if (mentionedUser._id.toString() === comment.owner.toString()) continue
+
+          // Skip if already getting a notification (owner or assignee)
+          const alreadyNotified =
+            (ticket.owner._id.toString() === mentionedUser._id.toString()) ||
+            (!_.isUndefined(ticket.assignee) && ticket.assignee._id.toString() === mentionedUser._id.toString())
+          if (alreadyNotified) continue
+
+          const mentionNotification = new NotificationSchema({
+            owner: mentionedUser._id,
+            title: 'You were mentioned in Ticket#' + ticket.uid,
+            message: ticket.subject,
+            type: 2,
+            data: { ticket },
+            unread: true
+          })
+
+          notificationPromises.push(mentionNotification.save())
+        } catch (mentionErr) {
+          winston.debug('Could not process mention for @' + username + ': ' + mentionErr.message)
         }
       }
 

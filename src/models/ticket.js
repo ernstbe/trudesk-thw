@@ -113,6 +113,12 @@ const ticketSchema = mongoose.Schema({
   notes: [noteSchema],
   attachments: [attachmentSchema],
   history: [historySchema],
+  checklist: [{
+    title: { type: String, required: true },
+    completed: { type: Boolean, default: false },
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'accounts' },
+    completedAt: { type: Date }
+  }],
   subscribers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'accounts' }]
 })
 

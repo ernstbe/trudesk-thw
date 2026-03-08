@@ -2,6 +2,7 @@ const _ = require('lodash')
 const Asset = require('../../../models/asset')
 const Ticket = require('../../../models/ticket')
 const apiUtil = require('../apiUtils')
+const pdfGenerator = require('../../../helpers/pdfGenerator')
 
 const assetsApi = {}
 
@@ -83,6 +84,15 @@ assetsApi.delete = async function (req, res) {
 
     await Asset.deleteOne({ _id: id })
     return apiUtil.sendApiSuccess(res)
+  } catch (err) {
+    return apiUtil.sendApiError(res, 500, err.message)
+  }
+}
+
+assetsApi.exportPdf = async function (req, res) {
+  try {
+    const assets = await Asset.getAll()
+    return pdfGenerator.generateAssetListPdf(assets, res)
   } catch (err) {
     return apiUtil.sendApiError(res, 500, err.message)
   }

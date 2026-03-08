@@ -17,6 +17,7 @@ const Ticket = require('../../../models/ticket')
 const StatusSchema = require('../../../models/ticketStatus')
 const GroupSchema = require('../../../models/group')
 const apiUtil = require('../apiUtils')
+const pdfGenerator = require('../../../helpers/pdfGenerator')
 
 const reportsApi = {}
 
@@ -75,6 +76,10 @@ reportsApi.handover = async function (req, res) {
       }
 
       return apiUtil.sendApiSuccess(res, { group: group.name, count: ticketSummaries.length, markdown: md })
+    }
+
+    if (format === 'pdf') {
+      return pdfGenerator.generateHandoverPdf(group.name, ticketSummaries, res)
     }
 
     return apiUtil.sendApiSuccess(res, { group: group.name, tickets: ticketSummaries })
@@ -185,6 +190,10 @@ reportsApi.sitzung = async function (req, res) {
       }
 
       result.markdown = md
+    }
+
+    if (format === 'pdf') {
+      return pdfGenerator.generateSitzungPdf(result, res)
     }
 
     return apiUtil.sendApiSuccess(res, result)
