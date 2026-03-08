@@ -65,7 +65,7 @@ noticesController.create = function (req, res) {
   res.render('subviews/createNotice', content)
 }
 
-noticesController.edit = function (req, res) {
+noticesController.edit = async function (req, res) {
   const user = req.user
   if (_.isUndefined(user) || !permissions.canThis(user.role, 'notices:update')) {
     req.flash('message', 'Permission Denied.')
@@ -79,12 +79,14 @@ noticesController.edit = function (req, res) {
   content.data = {}
   content.data.user = req.user
   content.data.common = req.viewdata
-  noticeSchema.getNotice(req.params.id, function (err, notice) {
-    if (err) return handleError(res, err)
-    content.data.notice = notice
 
-    res.render('subviews/editNotice', content)
-  })
+  try {
+    const notice = await noticeSchema.getNotice(req.params.id)
+    content.data.notice = notice
+    return res.render('subviews/editNotice', content)
+  } catch (err) {
+    return handleError(res, err)
+  }
 }
 
 module.exports = noticesController
