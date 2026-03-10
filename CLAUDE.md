@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Trudesk is a help desk / ticketing system built with Express + Handlebars (server-rendered) and React 18 (client islands). It uses MongoDB 8 via Mongoose 8, optional Elasticsearch 8, and Socket.IO for real-time features.
+Trudesk is a help desk / ticketing system built with Express + Handlebars (server-rendered) and React 18 (client islands). It uses MongoDB 8 via Mongoose 8, optional Elasticsearch 9, and Socket.IO for real-time features.
 
 ## Commands
 
@@ -79,5 +79,5 @@ React components mount into server-rendered Handlebars pages via container divs 
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, etc.) — enforced by commitlint + husky.
 - Code style: StandardJS + Prettier (120 char width, single quotes).
 - Package manager: Yarn 3.2.1 (`packageManager` field in package.json).
-- Node.js >= 20.19.0 required.
+- Node.js >= 22.0.0 required.
 - React components have been migrated from class components to functional components with hooks.
