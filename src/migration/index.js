@@ -16,7 +16,7 @@ const _ = require('lodash')
 const async = require('async')
 const winston = require('../logger')
 const semver = require('semver')
-const moment = require('moment')
+const dayjs = require('../helpers/dayjs')
 const version = require('../../package.json').version
 
 const SettingsSchema = require('../models/setting')
@@ -34,7 +34,7 @@ function performBackup (dbVersion, callback) {
       NODE_ENV: global.env,
       MONGOURI: database.connectionuri,
       PATH: process.env.PATH,
-      FILENAME: 'PREUPGRADE--trudesk-v' + dbVersion + '-' + moment().format('MMDDYYYY_HHmm') + '.zip'
+      FILENAME: 'PREUPGRADE--trudesk-v' + dbVersion + '-' + dayjs().format('MMDDYYYY_HHmm') + '.zip'
     }
   })
   global.forks.push({ name: 'backup', fork: child })

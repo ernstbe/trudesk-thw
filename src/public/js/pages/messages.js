@@ -21,7 +21,7 @@ define('pages/messages', [
   'modules/socket',
   'history',
   'isinview'
-], function ($, _, UIKit, moment, helpers) {
+], function ($, _, UIKit, dayjs, helpers) {
   const messagesPage = {}
 
   messagesPage.init = function (callback) {
@@ -222,7 +222,7 @@ define('pages/messages', [
             '" data-uk-tooltip="{pos:\'left\', animation: false}" title="' +
             message.owner.fullname +
             ' - ' +
-            moment(message.createdAt)
+            dayjs(message.createdAt)
               .tz(helpers.getTimezone())
               .format(helpers.getShortDateFormat() + ' ' + helpers.getTimeFormat()) +
             '"/>'
@@ -234,7 +234,7 @@ define('pages/messages', [
           html += '<div class="message message-right">'
           html +=
             '<div class="message-body" data-uk-tooltip="{pos:\'right\', animation: false}" title="' +
-            moment(message.createdAt)
+            dayjs(message.createdAt)
               .tz(helpers.getTimezone())
               .format(helpers.getShortDateFormat() + ' ' + helpers.getTimeFormat()) +
             '">'
@@ -300,7 +300,7 @@ define('pages/messages', [
           $recentMessages[message.conversation] = fromName + ': ' + message.body
           const timezone = helpers.getTimezone()
           convoListItem.find('.message-date').text(
-            moment
+            dayjs
               .utc()
               .tz(timezone)
               .calendar()
@@ -363,7 +363,7 @@ define('pages/messages', [
         html += '</div>'
         html += '<div class="convo-info">'
         html += '<span class="message-from">' + data.partner.fullname + '</span>'
-        html += '<span class="message-date">' + moment(data.updatedAt).calendar() + '</span>'
+        html += '<span class="message-date">' + dayjs(data.updatedAt).calendar() + '</span>'
         html += '<span class="message-subject">' + data.recentMessage + '</span>'
         html += '</div>'
         html += '</li>'

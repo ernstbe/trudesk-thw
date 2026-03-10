@@ -23,7 +23,7 @@ import PeityLine from 'components/Peity/peity-line'
 import MGraph from 'components/MGraph'
 import D3Pie from 'components/D3/d3pie'
 
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 import helpers from 'lib/helpers'
 
 function DashboardContainer ({
@@ -56,7 +56,7 @@ function DashboardContainer ({
   const formatString = helpers.getLongDateFormat() + ' ' + helpers.getTimeFormat()
   const tz = helpers.getTimezone()
   const lastUpdatedFormatted = dashboardState.lastUpdated
-    ? moment(dashboardState.lastUpdated, 'MM/DD/YYYY hh:mm:ssa')
+    ? dayjs(dashboardState.lastUpdated, 'MM/DD/YYYY hh:mm:ssa')
       .tz(tz)
       .format(formatString)
     : t('dashboard.cacheLoading')
@@ -233,7 +233,7 @@ function DashboardContainer ({
                             </td>
                             <td className='uk-width-6-10'>{ticket.get('subject')}</td>
                             <td className='uk-width-2-10 uk-text-right uk-text-muted uk-text-small'>
-                              {moment
+                              {dayjs
                                 .utc(ticket.get('updated'))
                                 .tz(helpers.getTimezone())
                                 .format(helpers.getShortDateFormat())}

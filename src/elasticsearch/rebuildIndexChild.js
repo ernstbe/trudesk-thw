@@ -1,7 +1,7 @@
 const async = require('async')
 const elasticsearch = require('@elastic/elasticsearch')
 const winston = require('../logger')
-const moment = require('moment-timezone')
+const dayjs = require('../helpers/dayjs')
 const database = require('../database')
 
 global.env = process.env.NODE_ENV || 'production'
@@ -294,7 +294,7 @@ function crawlTickets (callback) {
         issue: doc.issue,
         subject: doc.subject,
         date: doc.date,
-        dateFormatted: moment
+        dateFormatted: dayjs
           .utc(doc.date)
           .tz(ES.timezone)
           .format('MMMM D YYYY'),

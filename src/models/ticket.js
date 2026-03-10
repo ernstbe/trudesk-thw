@@ -15,7 +15,7 @@
 const mongoose = require('mongoose')
 const winston = require('../logger')
 const _ = require('lodash')
-const moment = require('moment')
+const dayjs = require('../helpers/dayjs')
 const sanitizeHtml = require('sanitize-html')
 // const redisCache          = require('../cache/rediscache');
 const xss = require('xss')
@@ -628,7 +628,7 @@ ticketSchema.statics.getAll = async function () {
 }
 
 ticketSchema.statics.getForCache = async function () {
-  const t365 = moment
+  const t365 = dayjs
     .utc()
     .hour(23)
     .minute(59)
@@ -1211,12 +1211,12 @@ ticketSchema.statics.getTopTicketGroups = async function (timespan, top) {
   if (_.isUndefined(timespan) || _.isNaN(timespan) || timespan === 0) timespan = -1
   if (_.isUndefined(top) || _.isNaN(top)) top = 5
 
-  const today = moment
+  const today = dayjs
     .utc()
     .hour(23)
     .minute(59)
     .second(59)
-  const tsDate = today.clone().subtract(timespan, 'd')
+  const tsDate = today.subtract(timespan, 'd')
   let query = {
     date: { $gte: tsDate.toDate(), $lte: today.toDate() },
     deleted: false

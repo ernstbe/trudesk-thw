@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 
 import { MESSAGES_UPDATE_UI_CONVERSATION_NOTIFICATIONS } from 'serverSocket/socketEventConsts'
 import PDropDown from 'components/PDropdown'
@@ -78,11 +78,11 @@ function ConversationsDropdownPartial ({ timezone, shortDateFormat, socket, forw
         <ul>
           {conversations.map(conversation => {
             const profilePic = conversation.partner.image || 'defaultProfile.jpg'
-            const formattedTimestamp = moment
+            const formattedTimestamp = dayjs
               .utc(conversation.updatedAt)
               .tz(timezone)
               .format('YYYY-MM-DDThh:mm')
-            const formattedDate = moment
+            const formattedDate = dayjs
               .utc(conversation.updatedAt)
               .tz(timezone)
               .format(shortDateFormat)

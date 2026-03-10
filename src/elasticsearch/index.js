@@ -18,7 +18,7 @@ const nconf = require('nconf')
 const winston = require('../logger')
 const elasticsearch = require('@elastic/elasticsearch')
 const emitter = require('../emitter')
-const moment = require('moment-timezone')
+const dayjs = require('../helpers/dayjs')
 const settingUtil = require('../settings/settingsUtil')
 
 const ES = {}
@@ -173,7 +173,7 @@ ES.setupHooks = () => {
         subject: ticket.subject,
         issue: ticket.issue,
         date: ticket.date,
-        dateFormatted: moment
+        dateFormatted: dayjs
           .utc(ticket.date)
           .tz(ES.timezone)
           .format('MMMM D YYYY'),

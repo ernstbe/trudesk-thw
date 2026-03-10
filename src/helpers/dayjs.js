@@ -1,0 +1,20 @@
+const dayjs = require('dayjs')
+const utc = require('dayjs/plugin/utc')
+const timezone = require('dayjs/plugin/timezone')
+const relativeTime = require('dayjs/plugin/relativeTime')
+const duration = require('dayjs/plugin/duration')
+const calendar = require('dayjs/plugin/calendar')
+const customParseFormat = require('dayjs/plugin/customParseFormat')
+const advancedFormat = require('dayjs/plugin/advancedFormat')
+const isBetween = require('dayjs/plugin/isBetween')
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.extend(relativeTime)
+dayjs.extend(duration)
+dayjs.extend(calendar)
+dayjs.extend(customParseFormat)
+dayjs.extend(advancedFormat)
+dayjs.extend(isBetween)
+
+module.exports = dayjs

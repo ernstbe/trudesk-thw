@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
 import { withTranslation, Trans } from 'react-i18next'
 import axios from 'axios'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 
 import { saveProfile, genMFA } from 'actions/accounts'
 import { showModal, hideModal, setSessionUser } from 'actions/common'
@@ -96,11 +96,10 @@ function ProfileContainer ({
   }, [])
 
   const _getTimezones = useCallback(() => {
-    return moment.tz
-      .names()
+    return Intl.supportedValuesOf('timeZone')
       .map(function (name) {
         const year = new Date().getUTCFullYear()
-        const timezoneAtBeginningOfyear = moment.tz(year + '-01-01', name)
+        const timezoneAtBeginningOfyear = dayjs.tz(year + '-01-01', name)
         return {
           utc: timezoneAtBeginningOfyear.utcOffset(),
           text: '(GMT' + timezoneAtBeginningOfyear.format('Z') + ') ' + name,

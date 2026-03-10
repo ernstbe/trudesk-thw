@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 import { isUndefined } from 'lodash'
 
 import { MESSAGES_SPAWN_CHAT_WINDOW } from 'serverSocket/socketEventConsts'
@@ -57,25 +57,7 @@ function OnlineUserListPartial ({ sessionUser, timezone, users, socket }) {
     if (isUndefined(date)) {
       return 'Never'
     }
-    moment.updateLocale('en', {
-      relativeTime: {
-        future: 'in %s',
-        past: '%s ago',
-        s: 'a few seconds',
-        m: '1m',
-        mm: '%dm',
-        h: '1h',
-        hh: '%dh',
-        d: '1d',
-        dd: '%dd',
-        M: '1mo',
-        MM: '%dmos',
-        y: '1y',
-        yy: '%dyrs'
-      }
-    })
-
-    return moment
+    return dayjs
       .utc(date)
       .tz(tz)
       .fromNow()

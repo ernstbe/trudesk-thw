@@ -12,10 +12,9 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-define('modules/socket.io/logs.io', ['jquery', 'underscore', 'moment', 'modules/helpers', 'history'], function (
+define('modules/socket.io/logs.io', ['jquery', 'underscore', 'modules/helpers', 'history'], function (
   $,
   _,
-  moment,
   helpers
 ) {
   const logsIO = {}

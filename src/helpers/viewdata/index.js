@@ -14,7 +14,7 @@
 
 const _ = require('lodash')
 const winston = require('../../logger')
-const moment = require('moment')
+const dayjs = require('../dayjs')
 const settingSchema = require('../../models/setting')
 const settingsUtil = require('../../settings/settingsUtil')
 
@@ -174,7 +174,7 @@ viewController.getData = function (request, cb) {
       viewdata.notice = activeNotice
       viewdata.noticeCookieName = undefined
       if (!_.isUndefined(activeNotice) && !_.isNull(activeNotice)) {
-        viewdata.noticeCookieName = activeNotice.name + '_' + moment(activeNotice.activeDate).format('MMMDDYYYY_HHmmss')
+        viewdata.noticeCookieName = activeNotice.name + '_' + dayjs(activeNotice.activeDate).format('MMMDDYYYY_HHmmss')
       }
 
       // Default ticket type

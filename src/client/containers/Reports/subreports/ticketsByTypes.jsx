@@ -13,7 +13,7 @@ import SingleSelect from 'components/SingleSelect'
 import Button from 'components/Button'
 import SpinLoader from 'components/SpinLoader'
 
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 import helpers from 'lib/helpers'
 
 const ReportTicketsByTypes = () => {
@@ -39,13 +39,13 @@ const ReportTicketsByTypes = () => {
     dispatch(fetchTicketTypes())
 
     setStartDate(
-      moment()
+      dayjs()
         .utc(true)
         .subtract(30, 'days')
         .format(helpers.getShortDateFormat())
     )
     setEndDate(
-      moment()
+      dayjs()
         .utc(true)
         .format(helpers.getShortDateFormat())
     )
@@ -77,7 +77,7 @@ const ReportTicketsByTypes = () => {
     dispatch(
       generateReport({
         type: 'tickets_by_type',
-        filename: `report_tickets_by_type__${moment(startDate).format('MMDDYYYY')}`,
+        filename: `report_tickets_by_type__${dayjs(startDate).format('MMDDYYYY')}`,
         startDate,
         endDate,
         groups: selectedGroups,

@@ -13,7 +13,7 @@
  */
 
 const _ = require('lodash')
-const moment = require('moment-timezone')
+const dayjs = require('../../../helpers/dayjs')
 const winston = require('../../../logger')
 const permissions = require('../../../permissions')
 const emitter = require('../../../emitter')
@@ -24,7 +24,7 @@ const apiTickets = {}
 
 function buildGraphData (arr, days, callback) {
   const graphData = []
-  const today = moment()
+  const today = dayjs()
     .hour(23)
     .minute(59)
     .second(59)
@@ -67,8 +67,8 @@ function buildAvgResponse (ticketArray, callback) {
   _.each(ticketArray, function (ticket) {
     if (_.isUndefined(ticket.comments) || _.size(ticket.comments) < 1) return
 
-    const ticketDate = moment(ticket.date)
-    const firstCommentDate = moment(ticket.comments[0].date)
+    const ticketDate = dayjs(ticket.date)
+    const firstCommentDate = dayjs(ticket.comments[0].date)
 
     const diff = firstCommentDate.diff(ticketDate, 'seconds')
     $ticketAvg.push(diff)
@@ -78,7 +78,7 @@ function buildAvgResponse (ticketArray, callback) {
     return m + x
   }, 0)
 
-  const tvt = moment.duration(Math.round(ticketAvgTotal / _.size($ticketAvg)), 'seconds').asHours()
+  const tvt = dayjs.duration(Math.round(ticketAvgTotal / _.size($ticketAvg)), 'seconds').asHours()
   cbObj.avgResponse = Math.floor(tvt)
 
   if (_.isFunction(callback)) {
@@ -1477,7 +1477,7 @@ apiTickets.getTicketStats = async function (req, res) {
     const settingsUtil = require('../../../settings/settingsUtil')
     const context = await settingsUtil.getSettings()
     const tz = context.data.settings.timezone.value
-    obj.lastUpdated = moment
+    obj.lastUpdated = dayjs
       .utc(obj.lastUpdated)
       .tz(tz)
       .format('MM-DD-YYYY hh:mm:ssa')
@@ -1566,7 +1566,7 @@ apiTickets.getTicketStatsForGroup = async function (req, res) {
 
     if (_.isEmpty(tickets)) throw new Error('Group has no tickets to report.')
 
-    const today = moment()
+    const today = dayjs()
       .hour(23)
       .minute(59)
       .second(59)
@@ -1578,7 +1578,7 @@ apiTickets.getTicketStatsForGroup = async function (req, res) {
       return v.status === 3
     })
 
-    const firstDate = moment(_.first(tickets).date).subtract(30, 'd')
+    const firstDate = dayjs(_.first(tickets).date).subtract(30, 'd')
     const diffDays = today.diff(firstDate, 'days')
 
     r.graphData = buildGraphData(tickets, diffDays)
@@ -1633,7 +1633,7 @@ apiTickets.getTicketStatsForUser = async function (req, res) {
 
     if (_.isEmpty(tickets)) throw new Error('User has no tickets to report.')
 
-    const today = moment()
+    const today = dayjs()
       .hour(23)
       .minute(59)
       .second(59)
@@ -1645,7 +1645,7 @@ apiTickets.getTicketStatsForUser = async function (req, res) {
       return v.status === 3
     })
 
-    const firstDate = moment(_.first(tickets).date).subtract(30, 'd')
+    const firstDate = dayjs(_.first(tickets).date).subtract(30, 'd')
     const diffDays = today.diff(firstDate, 'days')
 
     r.graphData = buildGraphData(tickets, diffDays)

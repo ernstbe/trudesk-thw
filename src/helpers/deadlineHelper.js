@@ -1,4 +1,4 @@
-const moment = require('moment')
+const dayjs = require('./dayjs')
 
 /**
  * Returns the deadline status for a given due date.
@@ -10,8 +10,8 @@ function getDeadlineStatus (dueDate) {
     return { status: 'green', daysRemaining: Infinity }
   }
 
-  const now = moment().startOf('day')
-  const due = moment(dueDate).startOf('day')
+  const now = dayjs().startOf('day')
+  const due = dayjs(dueDate).startOf('day')
   const daysRemaining = due.diff(now, 'days')
 
   let status

@@ -13,7 +13,7 @@
  */
 
 const _ = require('lodash')
-const moment = require('moment')
+const dayjs = require('../helpers/dayjs')
 
 const ticketSchema = require('../models/ticket')
 
@@ -22,12 +22,11 @@ const init = async function (tickets, timespan, callback) {
   let $tickets = []
   if (_.isUndefined(timespan) || _.isNaN(timespan) || timespan === 0) timespan = 365
 
-  let today = moment()
+  let today = dayjs()
     .hour(23)
     .minute(59)
     .second(59)
   const tsDate = today
-    .clone()
     .subtract(timespan, 'd')
     .toDate()
     .getTime()

@@ -14,7 +14,6 @@
 
 // var _               = require('lodash');
 const mongoose = require('mongoose')
-require('moment-duration-format')
 const utils = require('../helpers/utils')
 const _ = require('lodash')
 

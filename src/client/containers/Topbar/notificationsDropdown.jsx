@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 
 import PDropdown from 'components/PDropdown'
 
@@ -76,11 +76,11 @@ function NotificationsDropdownPartial ({ socket, shortDateFormat, timezone, onVi
       }
     >
       {notifications.map(notification => {
-        const formattedTimestamp = moment
+        const formattedTimestamp = dayjs
           .utc(notification.created)
           .tz(timezone)
           .format('YYYY-MM-DDThh:mm')
-        const formattedDate = moment
+        const formattedDate = dayjs
           .utc(notification.created)
           .tz(timezone)
           .format(shortDateFormat)

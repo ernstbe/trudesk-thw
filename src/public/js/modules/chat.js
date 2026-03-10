@@ -15,7 +15,7 @@
 define('modules/chat', ['jquery', 'underscore', 'moment', 'modules/helpers', 'uikit', 'autogrow', 'history'], function (
   $,
   _,
-  moment,
+  dayjs,
   helpers,
   UIKit
 ) {
@@ -430,7 +430,7 @@ define('modules/chat', ['jquery', 'underscore', 'moment', 'modules/helpers', 'ui
               ]
             if (userMeta && userMeta.deletedAt) {
               d.messages = _.filter(d.messages, function (message) {
-                return moment(message.createdAt) > moment(userMeta.deletedAt)
+                return dayjs(message.createdAt) > dayjs(userMeta.deletedAt)
               })
             }
             data.conversation.messages = d.messages
@@ -572,7 +572,7 @@ define('modules/chat', ['jquery', 'underscore', 'moment', 'modules/helpers', 'ui
       if (userMeta && userMeta.deletedAt) {
         html +=
           '<div class="chat-box-deletedAt">Conversation deleted at ' +
-          moment(userMeta.deletedAt).format(helpers.getShortDateFormat() + ' ' + helpers.getTimeFormat()) +
+          dayjs(userMeta.deletedAt).format(helpers.getShortDateFormat() + ' ' + helpers.getTimeFormat()) +
           '</div>'
       }
       html += '<div class="chat-message-list" data-chat-userid="' + user._id + '">'

@@ -456,7 +456,7 @@
     "shortDateFormatHint": "Set the format for short dates",
     "longDateFormat": "Long Date Format",
     "longDateFormatHint": "Set the format for long dates",
-    "momentFormatOptions": "Moment.js Format Options",
+    "momentFormatOptions": "Day.js Format Options",
     "siteLogo": "Site Logo",
     "siteLogoHint": "Upload site logo to display in top navigation.",
     "siteLogoNote": "Note: Resize to max width of 140px",

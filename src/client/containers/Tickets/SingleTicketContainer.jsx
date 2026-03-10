@@ -57,7 +57,7 @@ import axios from 'axios'
 import helpers from 'lib/helpers'
 import Log from '../../logger'
 import UIkit from 'uikit'
-import moment from 'moment'
+import dayjs from 'lib2/dayjs'
 import SpinLoader from 'components/SpinLoader'
 
 const showPriorityConfirm = () => {
@@ -517,7 +517,7 @@ function SingleTicketContainer (props) {
                               value={ticket.dueDate}
                               small
                               onChange={e => {
-                                const dueDate = moment(e.target.value, helpers.getShortDateFormat())
+                                const dueDate = dayjs(e.target.value, helpers.getShortDateFormat())
                                   .utc()
                                   .toISOString()
 
