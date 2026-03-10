@@ -21,8 +21,7 @@
 
 // node_modules
 const _ = require('lodash')
-const moment = require('moment-timezone')
-require('moment-duration-format')(moment)
+const dayjs = require('../dayjs')
 
 // The module to be exported
 const helpers = {
@@ -514,73 +513,60 @@ const helpers = {
   },
 
   now: function () {
-    return moment.utc()
+    return dayjs.utc()
   },
 
   formatDate: function (date, format, timezone) {
     if (!date) return ''
-    return moment
+    return dayjs
       .utc(date)
       .tz(typeof timezone === 'string' ? timezone : global.timezone)
       .format(format)
   },
 
   formatDateParse: function (date, parseFormat, returnFormat) {
-    return moment
+    return dayjs
       .utc(date, parseFormat)
       .tz(global.timezone)
       .format(returnFormat)
   },
 
   durationFormat: function (duration, parseFormat) {
-    return moment.duration(duration, parseFormat).format('Y [year], M [month], d [day], h [hour], m [min]', {
-      trim: 'both'
-    })
+    const dur = dayjs.duration(duration, parseFormat)
+    const parts = []
+    const y = Math.floor(dur.asYears())
+    const mo = dur.months()
+    const d = dur.days()
+    const h = dur.hours()
+    const m = dur.minutes()
+    if (y) parts.push(y + ' year')
+    if (mo) parts.push(mo + ' month')
+    if (d) parts.push(d + ' day')
+    if (h) parts.push(h + ' hour')
+    if (m) parts.push(m + ' min')
+    return parts.length > 0 ? parts.join(', ') : '0 min'
   },
 
   calendarDate: function (date, fallback) {
-    if (_.isObject(fallback)) {
-      fallback = 'll [at] LT'
-    }
-    moment.updateLocale('en', {
-      calendar: {
-        sameDay: '[Today at] LT',
-        lastDay: '[Yesterday at] LT',
-        nextDay: '[Tomorrow at] LT',
-        lastWeek: '[Last] ddd [at] LT',
-        nextWeek: 'ddd [at] LT',
-        sameElse: fallback
-      }
-    })
-    return moment
+    return dayjs
       .utc(date)
       .tz(global.timezone)
-      .calendar()
+      .calendar(null, {
+        sameDay: '[Today at] h:mm A',
+        lastDay: '[Yesterday at] h:mm A',
+        nextDay: '[Tomorrow at] h:mm A',
+        lastWeek: '[Last] ddd [at] h:mm A',
+        nextWeek: 'ddd [at] h:mm A',
+        sameElse: 'MMM D, YYYY [at] h:mm A'
+      })
   },
 
   fromNow: function (date) {
     if (_.isUndefined(date)) {
       return 'Never'
     }
-    moment.updateLocale('en', {
-      relativeTime: {
-        future: 'in %s',
-        past: '%s ago',
-        s: 'a few seconds',
-        m: '1m',
-        mm: '%dm',
-        h: '1h',
-        hh: '%dh',
-        d: '1d',
-        dd: '%dd',
-        M: '1mo',
-        MM: '%dmos',
-        y: '1y',
-        yy: '%dyrs'
-      }
-    })
 
-    return moment
+    return dayjs
       .utc(date)
       .tz(global.timezone)
       .fromNow()
@@ -781,14 +767,14 @@ const helpers = {
 
   overdue: function (showOverdue, date, updated, overdueIn, options) {
     if (!showOverdue) return ''
-    const now = moment()
+    const now = dayjs()
     if (updated) {
-      updated = moment(updated)
+      updated = dayjs(updated)
     } else {
-      updated = moment(date)
+      updated = dayjs(date)
     }
 
-    const timeout = updated.clone().add(overdueIn, 'm')
+    const timeout = updated.add(overdueIn, 'm')
     const result = now.isAfter(timeout)
 
     if (result) {

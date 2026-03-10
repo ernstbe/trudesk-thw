@@ -35,7 +35,7 @@ define([
   'multiselect',
   'moment_timezone',
   'waypoints'
-], function ($, _, __, moment, UIkit, CountUp, Waves, Selectize, Snackbar, Cookies, Tether) {
+], function ($, _, __, dayjs, UIkit, CountUp, Waves, Selectize, Snackbar, Cookies, Tether) {
   const helpers = {}
   const easingSwiftOut = [0.4, 0, 0.2, 1]
 
@@ -1039,7 +1039,7 @@ define([
       $.formUtils.addValidator({
         name: 'shortDate',
         validatorFunction: function (value) {
-          return moment(value, helpers.getShortDateFormat(), true).isValid()
+          return dayjs(value, helpers.getShortDateFormat(), true).isValid()
         },
         errorMessage: 'Invalid Date (' + helpers.getShortDateFormat() + ')',
         errorMessageKey: 'invalidShortDate'
@@ -1492,20 +1492,17 @@ define([
   }
 
   helpers.getCalendarDate = function (date) {
-    moment.updateLocale('en', {
-      calendar: {
-        sameDay: '[Today at] LT',
-        lastDay: '[Yesterday at] LT',
-        nextDay: '[Tomorrow at] LT',
-        lastWeek: '[Last] ddd [at] LT',
-        nextWeek: 'ddd [at] LT',
-        sameElse: helpers.getShortDateFormat()
-      }
-    })
-    return moment
+    return dayjs
       .utc(date)
       .tz(this.getTimezone())
-      .calendar()
+      .calendar(null, {
+        sameDay: '[Today at] h:mm A',
+        lastDay: '[Yesterday at] h:mm A',
+        nextDay: '[Tomorrow at] h:mm A',
+        lastWeek: '[Last] ddd [at] h:mm A',
+        nextWeek: 'ddd [at] h:mm A',
+        sameElse: helpers.getShortDateFormat()
+      })
   }
 
   helpers.calendarDate = helpers.getCalendarDate
@@ -1546,13 +1543,13 @@ define([
     const timezone = this.getTimezone()
 
     if (isUTC) {
-      return moment(date)
+      return dayjs(date)
         .utc(true)
         .tz(timezone)
         .format(format)
     }
 
-    return moment(date)
+    return dayjs(date)
       .tz(timezone)
       .format(format)
   }

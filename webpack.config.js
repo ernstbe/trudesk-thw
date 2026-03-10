@@ -36,8 +36,8 @@ module.exports = {
       jquery_scrollTo: 'vendor/jquery/jquery.scrollTo.min',
       jscookie: 'vendor/jscookie/js.cookie',
       easing: 'vendor/jquery/jquery.easing',
-      moment: 'vendor/moment/moment',
-      moment_timezone: 'vendor/moment/moment-timezone-with-data',
+      moment: 'vendor/dayjs/dayjs-moment-shim',
+      moment_timezone: 'vendor/dayjs/dayjs-moment-shim',
       uikit: 'vendor/uikit/js/uikit_combined.min',
       modernizr: 'vendor/modernizr/modernizr',
       underscore: 'vendor/underscore/underscore',
@@ -187,6 +187,7 @@ module.exports = {
       'window.Modernizr': 'modernizr',
       moment: 'moment',
       'window.moment': 'moment',
+      dayjs: 'moment',
       setImmediate: 'async'
     }),
     new webpack.IgnorePlugin({ resourceRegExp: /^\.\/locale$/ }),

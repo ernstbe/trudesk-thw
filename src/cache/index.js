@@ -18,7 +18,7 @@ const path = require('path')
 const nconf = require('nconf')
 const _ = require('lodash')
 const winston = require('../logger')
-const moment = require('moment-timezone')
+const dayjs = require('../helpers/dayjs')
 
 const truCache = {}
 let cache
@@ -37,7 +37,7 @@ function loadConfig () {
 }
 
 let refreshTimer
-let lastUpdated = moment.utc().tz(process.env.TIMEZONE || 'America/New_York')
+let lastUpdated = dayjs.utc().tz(process.env.TIMEZONE || 'America/New_York')
 
 truCache.init = function (callback) {
   cache = new NodeCache({
@@ -57,7 +57,7 @@ function restartRefreshClock () {
     clearInterval(refreshTimer)
   }
 
-  lastUpdated = moment()
+  lastUpdated = dayjs()
 
   refreshTimer = setInterval(function () {
     truCache.refreshCache()
@@ -220,8 +220,8 @@ truCache.refreshCache = function (callback) {
   process.on('message', function (message) {
     if (message.name === 'cache:refresh') {
       winston.debug('Refreshing Cache....')
-      const now = moment()
-      const timeSinceLast = Math.round(moment.duration(now.diff(lastUpdated)).asMinutes())
+      const now = dayjs()
+      const timeSinceLast = Math.round(dayjs.duration(now.diff(lastUpdated)).asMinutes())
       if (timeSinceLast < 5) {
         const i = 5 - timeSinceLast
         winston.debug('Cannot refresh cache for another ' + i + ' minutes')

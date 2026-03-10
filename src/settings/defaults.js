@@ -16,7 +16,7 @@ const _ = require('lodash')
 const fs = require('fs-extra')
 const path = require('path')
 const winston = require('../logger')
-const moment = require('moment-timezone')
+const dayjs = require('../helpers/dayjs')
 
 const SettingsSchema = require('../models/setting')
 const PrioritySchema = require('../models/ticketpriority')
@@ -208,11 +208,11 @@ async function timezoneDefault () {
 
     const saved = await defaultTimezone.save()
     winston.debug('Timezone set to ' + saved.value)
-    moment.tz.setDefault(saved.value)
+    dayjs.tz.setDefault(saved.value)
     global.timezone = saved.value
   } else {
     winston.debug('Timezone set to ' + setting.value)
-    moment.tz.setDefault(setting.value)
+    dayjs.tz.setDefault(setting.value)
     global.timezone = setting.value
   }
 }

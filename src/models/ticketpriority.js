@@ -14,8 +14,7 @@
 
 // var _               = require('lodash');
 const mongoose = require('mongoose')
-const moment = require('moment')
-require('moment-duration-format')
+const dayjs = require('../helpers/dayjs')
 const utils = require('../helpers/utils')
 
 const COLLECTION = 'priorities'
@@ -42,9 +41,19 @@ prioritySchema.pre('save', function () {
 
 prioritySchema.virtual('durationFormatted').get(function () {
   const priority = this
-  return moment
-    .duration(priority.overdueIn, 'minutes')
-    .format('Y [year], M [month], d [day], h [hour], m [min]', { trim: 'both' })
+  const dur = dayjs.duration(priority.overdueIn, 'minutes')
+  const parts = []
+  const y = Math.floor(dur.asYears())
+  const mo = dur.months()
+  const d = dur.days()
+  const h = dur.hours()
+  const m = dur.minutes()
+  if (y) parts.push(y + ' year')
+  if (mo) parts.push(mo + ' month')
+  if (d) parts.push(d + ' day')
+  if (h) parts.push(h + ' hour')
+  if (m) parts.push(m + ' min')
+  return parts.length > 0 ? parts.join(', ') : '0 min'
 })
 
 prioritySchema.statics.getPriority = async function (_id) {

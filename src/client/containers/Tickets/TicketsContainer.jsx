@@ -45,7 +45,7 @@ import DropdownSeparator from 'components/Dropdown/DropdownSeperator'
 
 import helpers from 'lib/helpers'
 import { createTimeline, utils } from 'animejs'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 import SearchResults from 'components/SearchResults'
 
 function TicketsContainer (props) {
@@ -390,12 +390,12 @@ function TicketsContainer (props) {
               const isOverdue = () => {
                 if (!common.viewdata.get('showOverdue') || [2, 3].indexOf(ticket.get('status')) !== -1) { return false }
                 const overdueIn = ticket.getIn(['priority', 'overdueIn'])
-                const now = moment()
+                const now = dayjs()
                 let updated = ticket.get('updated')
-                if (updated) updated = moment(updated)
-                else updated = moment(ticket.get('date'))
+                if (updated) updated = dayjs(updated)
+                else updated = dayjs(ticket.get('date'))
 
-                const timeout = updated.clone().add(overdueIn, 'm')
+                const timeout = updated.add(overdueIn, 'm')
                 return now.isAfter(timeout)
               }
 

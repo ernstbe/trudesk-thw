@@ -16,7 +16,7 @@ import React, { useCallback } from 'react'
 import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
 import { withTranslation } from 'react-i18next'
-import moment from 'moment-timezone'
+import dayjs from 'lib2/dayjs'
 import { updateSetting } from 'actions/settings'
 
 import SettingItem from 'components/Settings/SettingItem'
@@ -43,11 +43,10 @@ const GeneralSettings = ({ active, updateSetting, viewdata, settings, t }) => {
   )
 
   const getTimezones = useCallback(() => {
-    return moment.tz
-      .names()
+    return Intl.supportedValuesOf('timeZone')
       .map(function (name) {
         const year = new Date().getUTCFullYear()
-        const timezoneAtBeginningOfyear = moment.tz(year + '-01-01', name)
+        const timezoneAtBeginningOfyear = dayjs.tz(year + '-01-01', name)
         return {
           utc: timezoneAtBeginningOfyear.utcOffset(),
           text: '(GMT' + timezoneAtBeginningOfyear.format('Z') + ') ' + name,
@@ -120,7 +119,7 @@ const GeneralSettings = ({ active, updateSetting, viewdata, settings, t }) => {
       <SettingItem
         title={t('settings.timeDateFormat')}
         subtitle={
-          <a href='https://momentjs.com/docs/#/displaying/format/' rel='noopener noreferrer' target='_blank'>
+          <a href='https://day.js.org/docs/en/display/format' rel='noopener noreferrer' target='_blank'>
             {t('settings.momentFormatOptions')}
           </a>
         }

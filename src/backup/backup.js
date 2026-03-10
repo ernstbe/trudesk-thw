@@ -19,7 +19,7 @@ const spawn = require('child_process').spawn
 const archiver = require('archiver')
 const database = require('../database')
 const winston = require('../logger')
-const moment = require('moment')
+const dayjs = require('../helpers/dayjs')
 const pkg = require('../../package.json')
 
 global.env = process.env.NODE_ENV || 'production'
@@ -125,7 +125,7 @@ function runBackup (callback) {
 
 ;(function () {
   CONNECTION_URI = process.env.MONGOURI
-  FILENAME = process.env.FILENAME || 'trudesk-v' + pkg.version + '-' + moment().format('MMDDYYYY_HHmm') + '.zip'
+  FILENAME = process.env.FILENAME || 'trudesk-v' + pkg.version + '-' + dayjs().format('MMDDYYYY_HHmm') + '.zip'
 
   if (!CONNECTION_URI) return process.send({ error: { message: 'Invalid connection uri' } })
   const options = {

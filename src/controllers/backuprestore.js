@@ -16,7 +16,7 @@ const _ = require('lodash')
 const fs = require('fs-extra')
 const path = require('path')
 const async = require('async')
-const moment = require('moment')
+const dayjs = require('../helpers/dayjs')
 
 const backupRestore = {}
 
@@ -58,7 +58,7 @@ backupRestore.getBackups = function (req, res) {
       function (err) {
         if (err) return res.status(400).json({ success: false, error: err })
         fileWithStats = _.sortBy(fileWithStats, function (o) {
-          return moment(o.time)
+          return dayjs(o.time).valueOf()
         }).reverse()
         return res.json({ success: true, files: fileWithStats })
       }

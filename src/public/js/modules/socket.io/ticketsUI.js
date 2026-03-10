@@ -15,7 +15,6 @@
 define('modules/socket.io/ticketsUI', [
   'jquery',
   'underscore',
-  'moment',
   'modules/helpers',
   'modules/navigation',
   'history'
