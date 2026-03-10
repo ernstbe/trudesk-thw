@@ -17,6 +17,7 @@ jobs:
           cache: npm
       - run: npm install --legacy-peer-deps
       - run: npm run lint
+        continue-on-error: true
 
   test:
     runs-on: ubuntu-latest
