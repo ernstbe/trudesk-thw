@@ -298,5 +298,5 @@
       }
     }
   },
-  "packageManager": "yarn@3.2.1"
+  "packageManager": "npm@10.9.4"
 }
