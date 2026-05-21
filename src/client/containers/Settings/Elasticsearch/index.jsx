@@ -28,10 +28,23 @@ import helpers from 'lib/helpers'
 import UIKit from 'uikit'
 
 const ElasticsearchSettingsContainer = ({ active, settings, updateSetting, updateMultipleSettings, t }) => {
-  const [esStatus, setEsStatus] = useState('Not Configured')
+  // Map the raw server status string to a translated label. The /api/v2/es/status
+  // endpoint sends English literals (Connected, Not Configured, Error). Keep the
+  // server contract unchanged but translate at the rendering boundary.
+  const translateStatus = s => {
+    if (!s) return t('settings.notConfigured')
+    const key = s.toString().toLowerCase()
+    if (key === 'connected') return t('settings.connected')
+    if (key === 'not configured') return t('settings.notConfigured')
+    if (key === 'rebuilding...' || key === 'rebuilding') return t('settings.rebuilding')
+    if (key === 'error') return t('settings.error')
+    return s
+  }
+
+  const [esStatus, setEsStatus] = useState(t('settings.notConfigured'))
   const [esStatusClass, setEsStatusClass] = useState('')
   const [indexCount, setIndexCount] = useState(0)
-  const [inSyncText, setInSyncText] = useState('Not Configured')
+  const [inSyncText, setInSyncText] = useState(t('settings.notConfigured'))
   const [inSyncClass, setInSyncClass] = useState('')
   const [disableRebuild, setDisableRebuild] = useState(false)
 
@@ -47,18 +60,18 @@ const ElasticsearchSettingsContainer = ({ active, settings, updateSetting, updat
       .then(res => {
         const data = res.data
         if (data.status.isRebuilding) {
-          setEsStatus('Rebuilding...')
+          setEsStatus(t('settings.rebuilding'))
           setEsStatusClass('')
-        } else setEsStatus(data.status.esStatus)
+        } else setEsStatus(translateStatus(data.status.esStatus))
         if (data.status.esStatus && data.status.esStatus.toLowerCase() === 'connected') setEsStatusClass('text-success')
         else if (data.status.esStatus && data.status.esStatus.toLowerCase() === 'error') setEsStatusClass('text-danger')
 
         setIndexCount(data.status.indexCount.toLocaleString())
         if (data.status.inSync) {
-          setInSyncText('In Sync')
+          setInSyncText(t('settings.inSync'))
           setInSyncClass('bg-success')
         } else {
-          setInSyncText('Out of Sync')
+          setInSyncText(t('settings.outOfSync'))
           setInSyncClass('bg-warn')
         }
 
@@ -120,9 +133,9 @@ const ElasticsearchSettingsContainer = ({ active, settings, updateSetting, updat
           getStatusFn()
         } else {
           setConfigured(false)
-          setEsStatus('Not Configured')
+          setEsStatus(t('settings.notConfigured'))
           setEsStatusClass('')
-          setInSyncText('Not Configured')
+          setInSyncText(t('settings.notConfigured'))
           setInSyncClass('')
           setIndexCount(0)
         }
