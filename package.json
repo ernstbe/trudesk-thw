@@ -47,7 +47,7 @@
     "debug": "4.4.3",
     "dive": "0.5.0",
     "email-templates": "13.0.1",
-    "express": "4.22.2",
+    "express": "5.2.1",
     "express-hbs": "2.5.0",
     "express-session": "1.19.0",
     "express-static-gzip": "3.0.1",
