@@ -73,12 +73,12 @@ const eventTicketCreated = require('./events/event_ticket_created')
         content = ticket.history[ticket.history.length - 1].description
         comment = ticket.comments[ticket.comments.length - 1]
         users = ticket.subscribers
-          .map(function (o) {
-            if (comment.owner._id.toString() !== o._id.toString()) {
-              return o._id
-            }
+          .filter(function (o) {
+            return comment.owner._id.toString() !== o._id.toString()
           })
-          .filter(Boolean)
+          .map(function (o) {
+            return o._id
+          })
         break
       case 3:
         title = message.owner.fullname + ' sent you a message'

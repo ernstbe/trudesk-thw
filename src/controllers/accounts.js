@@ -199,7 +199,7 @@ accountsController.bindLdap = function (req, res) {
       if (err && !res.headersSent) return res.status(400).json({ success: false, error: err })
       if (results === undefined) return res.status(400).json({ success: false, error: 'Undefined Results' })
 
-      const entries = results.entries
+      let entries = results.entries
       let foundUsers = null
       ldap.unbind(function (err) {
         if (err && !res.headersSent) return res.status(400).json({ success: false, error: err })

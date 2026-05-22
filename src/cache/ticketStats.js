@@ -127,8 +127,8 @@ const init = function (tickets, callback) {
               ex.e365.tickets = $tickets
 
               ex.e365.closedTickets = ex.e365.tickets.map(t => t.status).filter(function (v) {
-                  return v === 3
-                })
+                return v === 3
+              })
 
               buildGraphData(ex.e365.tickets, 365, function (graphData) {
                 ex.e365.graphData = graphData
@@ -153,8 +153,8 @@ const init = function (tickets, callback) {
               ex.e180.tickets = $tickets
 
               ex.e180.closedTickets = ex.e180.tickets.map(t => t.status).filter(function (v) {
-                  return v === 3
-                })
+                return v === 3
+              })
 
               buildGraphData(ex.e180.tickets, 180, function (graphData) {
                 ex.e180.graphData = graphData
@@ -178,8 +178,8 @@ const init = function (tickets, callback) {
               ex.e90.tickets = $tickets
 
               ex.e90.closedTickets = ex.e90.tickets.map(t => t.status).filter(function (v) {
-                  return v === 3
-                })
+                return v === 3
+              })
 
               buildGraphData(ex.e90.tickets, 90, function (graphData) {
                 ex.e90.graphData = graphData
@@ -203,8 +203,8 @@ const init = function (tickets, callback) {
               ex.e60.tickets = $tickets
 
               ex.e60.closedTickets = ex.e60.tickets.map(t => t.status).filter(function (v) {
-                  return v === 3
-                })
+                return v === 3
+              })
 
               buildGraphData(ex.e60.tickets, 60, function (graphData) {
                 ex.e60.graphData = graphData
@@ -228,8 +228,8 @@ const init = function (tickets, callback) {
               ex.e30.tickets = $tickets
 
               ex.e30.closedTickets = ex.e30.tickets.map(t => t.status).filter(function (v) {
-                  return v === 3
-                })
+                return v === 3
+              })
 
               buildGraphData(ex.e30.tickets, 30, function (graphData) {
                 ex.e30.graphData = graphData

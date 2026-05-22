@@ -220,7 +220,7 @@ middleware.apiv2 = function (req, res, next) {
   if (req.user) return next()
 
   const passport = require('passport')
-  passport.authenticate('jwt', { session: true }, async function (err, user) {
+  passport.authenticate('jwt', { session: true }, async function (_err, user) {
     if (user) {
       req.user = user
       return next()

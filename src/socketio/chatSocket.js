@@ -110,8 +110,8 @@ function updateUsers () {
                 })
 
                 const agentsAndAdmins = Object.values(sortedUserList).filter(function (u) {
-                    return u.user.role.isAdmin || u.user.role.isAgent
-                  })
+                  return u.user.role.isAdmin || u.user.role.isAgent
+                })
 
                 usersOfGroups = [].concat(usersOfGroups, agentsAndAdmins)
 
@@ -121,19 +121,19 @@ function updateUsers () {
                 onlineUsernames = onlineUsernames.flat(Infinity)
 
                 const sortedUsernames = usersOfGroups.flat(Infinity).map(function (u) {
-                    return u.user.username
-                  })
+                  return u.user.username
+                })
 
                 const actual = onlineUsernames.filter(u => sortedUsernames.includes(u))
 
                 const seenIds = new Set()
                 usersOfGroups = usersOfGroups.flat(Infinity).filter(function (i) {
-                    if (actual.indexOf(i.user.username) === -1) return false
-                    const id = i.user._id.toString()
-                    if (seenIds.has(id)) return false
-                    seenIds.add(id)
-                    return true
-                  })
+                  if (actual.indexOf(i.user.username) === -1) return false
+                  const id = i.user._id.toString()
+                  if (seenIds.has(id)) return false
+                  seenIds.add(id)
+                  return true
+                })
 
                 const sortedKeys = usersOfGroups.map(function (m) {
                   return m.user.username

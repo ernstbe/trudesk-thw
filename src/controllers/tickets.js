@@ -478,8 +478,8 @@ ticketsController.single = async function (req, res) {
         userGroups = await groupSchema.find({})
       } else {
         userGroups = departments.map(function (d) {
-            return d.groups
-          }).flat(Infinity)
+          return d.groups
+        }).flat(Infinity)
       }
     }
 

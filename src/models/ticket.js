@@ -711,10 +711,10 @@ ticketSchema.statics.getTicketsByDepartments = async function (departments, obje
     return this.getTicketsWithObject(groups, object)
   } else {
     const groups = departments.map(function (d) {
-        return d.groups.map(function (g) {
-          return g._id
-        })
-      }).flat(Infinity)
+      return d.groups.map(function (g) {
+        return g._id
+      })
+    }).flat(Infinity)
 
     return this.getTicketsWithObject(groups, object)
   }

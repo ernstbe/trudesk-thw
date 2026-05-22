@@ -118,14 +118,14 @@ const PDropDown = ({
         top = top + 'px'
 
         const aLinks = refEl.querySelectorAll('a')
-        // eslint-disable-next-line no-unused-vars
+
         for (const link of aLinks) {
           link.removeEventListener('click', closeOnClick)
           link.addEventListener('click', closeOnClick)
         }
 
         const closeOnClickEls = refEl.querySelectorAll('.close-on-click')
-        // eslint-disable-next-line no-unused-vars
+
         for (const link of closeOnClickEls) {
           link.removeEventListener('click', closeOnClick)
           link.addEventListener('click', closeOnClick)
