@@ -169,12 +169,13 @@ api.tickets.createStatus = ({ name, htmlColor }) => {
       return res.data
     })
 }
-api.tickets.updateStatus = ({ id, name, htmlColor, isResolved, slatimer }) => {
+api.tickets.updateStatus = ({ id, name, htmlColor, isResolved, isInProgress, slatimer }) => {
   return axios
     .put(`/api/v1/tickets/status/${id}`, {
       name,
       htmlColor,
       isResolved,
+      isInProgress,
       slatimer
     })
     .then(res => {

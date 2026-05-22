@@ -30,11 +30,13 @@ const TicketStatusBody = ({ status, fetchSettings, showModal }) => {
   const [htmlColor, setHtmlColor] = useState('')
   const [slatimer, setSlatimer] = useState('')
   const [isResolved, setIsResolved] = useState('')
+  const [isInProgress, setIsInProgress] = useState('')
 
   useEffect(() => {
     setStatusName(status.get('name') || '')
     setHtmlColor(status.get('htmlColor') || '')
     setIsResolved(status.get('isResolved') || false)
+    setIsInProgress(status.get('isInProgress') || false)
     setSlatimer(status.get('slatimer') || false)
   }, [])
 
@@ -42,6 +44,7 @@ const TicketStatusBody = ({ status, fetchSettings, showModal }) => {
     if (statusName === '') setStatusName(status.get('name') || '')
     if (htmlColor === '') setHtmlColor(status.get('htmlColor') || '')
     if (isResolved === '') setIsResolved(status.get('isResolved') || false)
+    if (isInProgress === '') setIsInProgress(status.get('isInProgress') || false)
     if (slatimer === '') setSlatimer(status.get('slatimer') || false)
   })
 
@@ -50,7 +53,7 @@ const TicketStatusBody = ({ status, fetchSettings, showModal }) => {
       const id = status.get('_id')
 
       api.tickets
-        .updateStatus({ id, name: statusName, htmlColor, isResolved, slatimer })
+        .updateStatus({ id, name: statusName, htmlColor, isResolved, isInProgress, slatimer })
         .then(res => {
           helpers.UI.showSnackbar('Status updated')
           fetchSettings()
@@ -60,7 +63,7 @@ const TicketStatusBody = ({ status, fetchSettings, showModal }) => {
           helpers.UI.showSnackbar(e, true)
         })
     },
-    [status, statusName, htmlColor, isResolved, slatimer, fetchSettings]
+    [status, statusName, htmlColor, isResolved, isInProgress, slatimer, fetchSettings]
   )
 
   const showDeleteTicketStatusModal = useCallback(
@@ -111,7 +114,26 @@ const TicketStatusBody = ({ status, fetchSettings, showModal }) => {
             stateName={`isResolved_${status.get('_id')}`}
             label='Yes'
             checked={isResolved}
-            onChange={e => setIsResolved(e.target.checked)}
+            onChange={e => {
+              const checked = e.target.checked
+              setIsResolved(checked)
+              if (checked) setIsInProgress(false)
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+          <h4 className='uk-width-1-2' style={{ flexGrow: 1 }}>
+            Is In Progress
+          </h4>
+          <EnableSwitch
+            stateName={`isInProgress_${status.get('_id')}`}
+            label='Yes'
+            checked={isInProgress}
+            onChange={e => {
+              const checked = e.target.checked
+              setIsInProgress(checked)
+              if (checked) setIsResolved(false)
+            }}
           />
         </div>
         <div className='uk-margin-large-top' style={{ display: 'flex', justifyContent: 'flex-end' }}>
