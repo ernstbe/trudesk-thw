@@ -25,6 +25,7 @@ const statusSchema = mongoose.Schema(
     order: { type: Number, index: true },
     slatimer: { type: Boolean, default: true },
     isResolved: { type: Boolean, default: false },
+    isInProgress: { type: Boolean, default: false },
     isLocked: { type: Boolean, default: false }
   },
   {

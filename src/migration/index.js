@@ -235,6 +235,19 @@ function removeAgentsFromGroups (callback) {
   })
 }
 
+async function migrateStatusInProgress () {
+  const Status = require('../models/ticketStatus')
+  const matchingNames = ['Pending', 'In Progress', 'In Bearbeitung', 'Ausstehend']
+  await Status.collection.updateMany(
+    { name: { $in: matchingNames }, isInProgress: { $exists: false } },
+    { $set: { isInProgress: true } }
+  )
+  await Status.collection.updateMany(
+    { isInProgress: { $exists: false } },
+    { $set: { isInProgress: false } }
+  )
+}
+
 function createTicketStatus (callback) {
   const Status = require('../models/ticketStatus')
   const counterSchema = require('../models/counters')
@@ -386,6 +399,14 @@ migrations.run = function (callback) {
         } else {
           return next()
         }
+      },
+      function (next) {
+        migrateStatusInProgress()
+          .then(() => next())
+          .catch(err => {
+            winston.warn('migrateStatusInProgress failed: ' + err.message)
+            return next()
+          })
       }
     ],
     function (err) {

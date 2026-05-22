@@ -1385,6 +1385,8 @@ apiTickets.updateStatus = async function (req, res) {
     if (data.name) status.name = data.name
     if (data.htmlColor) status.htmlColor = data.htmlColor
     status.isResolved = data.isResolved
+    status.isInProgress = data.isInProgress
+    if (status.isResolved && status.isInProgress) status.isInProgress = false
     status.slatimer = data.slatimer
 
     const p = await status.save()
