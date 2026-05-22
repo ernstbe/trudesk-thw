@@ -106,7 +106,7 @@
     "react-singleton-hook": "4.0.1",
     "react-sizeme": "3.0.2",
     "redis": "5.12.1",
-    "redux": "4.2.0",
+    "redux": "5.0.1",
     "redux-actions": "3.0.3",
     "redux-define": "1.1.1",
     "redux-saga": "1.5.0",
