@@ -12,7 +12,6 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-const async = require('async')
 const winston = require('../../../logger')
 
 const commonV1 = {}

@@ -1557,7 +1557,7 @@ apiTickets.getTicketStats = async function (req, res) {
 }
 
 function parseTicketStats (role, tickets, callback) {
-  if (tickets.length === 0) return callback({ tickets, tags: {} }) // eslint-disable-line n/no-callback-literal
+  if (tickets.length === 0) return callback({ tickets, tags: {} })
   let t = []
   let tags = {}
   if (!permissions.canThis(role, 'tickets:notes')) {
@@ -1582,7 +1582,7 @@ function parseTicketStats (role, tickets, callback) {
     Object.entries(tags).sort(([a], [b]) => a.localeCompare(b))
   )
 
-  return callback({ tickets, tags }) // eslint-disable-line n/no-callback-literal
+  return callback({ tickets, tags })
 }
 
 /**

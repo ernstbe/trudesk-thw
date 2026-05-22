@@ -1,3 +1,5 @@
+/* eslint-disable camelcase */
+// MetricsGraphics' option keys use snake_case; mirror them here.
 import React, { useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
 

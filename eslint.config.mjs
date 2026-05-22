@@ -21,6 +21,14 @@ export default [
     }
   },
   {
+    files: ['src/client/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser
+      }
+    }
+  },
+  {
     files: ['test/**/*.js'],
     languageOptions: {
       globals: {

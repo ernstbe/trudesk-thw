@@ -59,7 +59,7 @@ function performBackup (dbVersion, callback) {
 
   child.on('close', function () {
     if (!result) {
-      return callback({ success: false, error: 'An Unknown Error Occurred' }) // eslint-disable-line n/no-callback-literal
+      return callback({ success: false, error: 'An Unknown Error Occurred' })
     }
 
     if (result.error) {

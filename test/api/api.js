@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-expressions */
 /* globals server */
 const request = require('supertest')
 

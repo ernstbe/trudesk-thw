@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-expressions */
 const expect = require('chai').expect
 const i18n = require('../../src/i18n')
 

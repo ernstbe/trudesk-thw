@@ -111,7 +111,7 @@ describe('web push: VAPID + subscription CRUD + post-save fan-out', function () 
       })
       // The hook runs synchronously after save, but the actual call is
       // fire-and-forget. Tick once so the catch chain doesn't unhandle.
-      await new Promise(r => setImmediate(r))
+      await new Promise(resolve => setImmediate(resolve))
       expect(captured, 'sendToUser was invoked').to.exist
       expect(captured.userId).to.equal(String(createdUser._id))
       expect(captured.payload.title).to.equal('Hooked')

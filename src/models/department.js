@@ -76,8 +76,8 @@ departmentSchema.statics.getDepartmentGroupsOfUser = async function (userId) {
     return merged
   } else {
     const groups = departments.map(function (department) {
-        return department.groups
-      }).flat(Infinity)
+      return department.groups
+    }).flat(Infinity)
 
     return groups
   }

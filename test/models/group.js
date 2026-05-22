@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-expressions */
 const expect = require('chai').expect
 const m = require('mongoose')
 const groupSchema = require('../../src/models/group')
