@@ -392,7 +392,7 @@ debugController.populatedatabase = async function (req, res) {
     const types = await ticketTypeSchema.getTypes()
     const tags = await tagSchema.getTags()
 
-    const loremIpsum = require('lorem-ipsum')
+    const { loremIpsum } = require('lorem-ipsum')
     for (let i = 0; i < 100001; i++) {
       const user = allUsers[Math.floor(Math.random() * allUsers.length)]
       const group = allGroups[Math.floor(Math.random() * allGroups.length)]
