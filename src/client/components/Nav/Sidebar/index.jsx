@@ -52,6 +52,14 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
     >
       <div id='side-nav-container' style={{ minHeight: 'calc(100% - 50px)' }}>
         <ul className='side-nav'>
+          {/*
+            Sidebar is structured as an admin backoffice: every action lives under
+            a labelled section so the purpose is obvious at a glance. Tickets,
+            Messages, Reports and Notices are intentionally absent — the trudesk
+            web UI is the admin backoffice (see mainController.loginPost admin
+            gate); Helfer/Bearbeiter work tickets in the PWA. Page routes for the
+            hidden views still exist server-side, only the nav was trimmed.
+          */}
           {sessionUser && Helpers.canUser('agent:*', true) && (
             <SidebarItem
               text={t('nav.dashboard')}
@@ -61,17 +69,12 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
               active={activeItem === 'dashboard'}
             />
           )}
-          {/*
-            Tickets, Messages, Reports and Notices nav entries have been hidden:
-            the trudesk web UI is now the admin backoffice (see mainController.loginPost
-            admin gate), and the PWA is where Helfer/Bearbeiter view and work
-            tickets. The page routes still exist server-side, but nothing in the
-            admin nav links to them.
-          */}
+
+          <NavSeparator label={t('nav.sectionUsers', 'Benutzer & Zugriff')} />
           {sessionUser && Helpers.canUser('accounts:view') && (
             <SidebarItem
               text={t('nav.accounts')}
-              icon='&#xE7FD;'
+              icon='manage_accounts'
               href='/accounts'
               class='navAccounts'
               active={activeItem === 'accounts'}
@@ -90,7 +93,7 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
                     <SubmenuItem
                       href='/accounts/agents'
                       text={t('accounts.agents')}
-                      icon='account_circle'
+                      icon='badge'
                       active={activeSubItem === 'accounts-agents'}
                     />
                   )}
@@ -98,7 +101,7 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
                     <SubmenuItem
                       href='/accounts/admins'
                       text={t('accounts.admins')}
-                      icon='how_to_reg'
+                      icon='shield'
                       active={activeSubItem === 'accounts-admins'}
                     />
                   )}
@@ -109,19 +112,21 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
           {sessionUser && Helpers.canUser('groups:view') && (
             <SidebarItem
               text={t('teams.customerGroups', 'Customer Groups')}
-              icon='supervisor_account'
+              icon='groups'
               href='/groups'
               class='navGroups'
               active={activeItem === 'groups'}
             />
           )}
+
+          <NavSeparator label={t('nav.sectionOrg', 'Organisation')} />
           {sessionUser && Helpers.canUser('teams:view') && (
-            <SidebarItem text={t('nav.teams')} icon='wc' href='/teams' class='navTeams' active={activeItem === 'teams'} />
+            <SidebarItem text={t('nav.teams')} icon='diversity_3' href='/teams' class='navTeams' active={activeItem === 'teams'} />
           )}
           {sessionUser && Helpers.canUser('departments:view') && (
             <SidebarItem
               text={t('nav.departments')}
-              icon='domain'
+              icon='apartment'
               href='/departments'
               class='navTeams'
               active={activeItem === 'departments'}
@@ -129,6 +134,7 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
           )}
           {/* {renderPlugins()} */}
 
+          <NavSeparator label={t('nav.sectionSystem', 'System')} />
           {sessionUser && Helpers.canUser('settings:edit') && (
             <SidebarItem
               text={t('nav.settings')}
@@ -212,7 +218,7 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
               </Submenu>
             </SidebarItem>
           )}
-          <NavSeparator />
+          <NavSeparator label={t('nav.sectionHelp', 'Hilfe')} />
           <SidebarItem href='/about' icon='help' text={t('common.about', 'About')} active={activeItem === 'about'} />
           {/* <SidebarItem href={'https://www.trudesk.io'} icon={'cloud'} text={'Cloud'} target={'_blank'} /> */}
         </ul>
