@@ -152,6 +152,15 @@ accountsApi.get = async function (req, res) {
           a.groups = groups.map(function (group) {
             return { name: group.name, _id: group._id }
           })
+          // Include team memberships so the edit-account UI can show legacy
+          // team assignments (from before public signup stopped auto-adding
+          // every new user to every team — PR #80). Without this, admins
+          // promoting a customer to agent never see the stale OV-Stab-style
+          // memberships and perceive them as "auto-assigned on role change".
+          const teams = await Team.getTeamsOfUser(account._id)
+          a.teams = teams.map(function (team) {
+            return { name: team.name, _id: team._id }
+          })
           resAccounts.push(a)
         }
         return apiUtil.sendApiSuccess(res, { accounts: resAccounts, count: resAccounts.length })
