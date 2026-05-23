@@ -148,6 +148,12 @@ teamSchema.statics.getTeam = async function (id) {
 }
 
 function isMember (arr, id) {
+  // Legacy teams can have `members: null` in the database — addMember already
+  // self-heals to [], but removeMember/isMember hit this first and crashed
+  // with "Cannot read properties of null (reading 'filter')" during account
+  // role changes. Treat absent membership lists as "no members".
+  if (!Array.isArray(arr)) return false
+
   const matches = arr.filter(function (value) {
     if (value._id.toString() === id.toString()) return true
     return false

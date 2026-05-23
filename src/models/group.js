@@ -220,6 +220,10 @@ groupSchema.statics.getGroupById = async function (gId) {
 }
 
 function isMember (arr, id) {
+  // Mirror of team.js: treat null/undefined member arrays as "no members"
+  // instead of crashing on .filter when legacy docs lack the array.
+  if (!Array.isArray(arr)) return false
+
   const matches = arr.filter(function (value) {
     return value._id.toString() === id.toString()
   })
