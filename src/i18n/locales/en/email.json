@@ -5,5 +5,6 @@
   "passwordResetRequest": "[{{siteTitle}}] Password Reset Request",
   "twoFactorRemoved": "[{{siteTitle}}] Two-Factor Authentication Removed!",
   "newPassword": "[{{siteTitle}}] New Password",
-  "welcomeAccount": "Welcome to {{siteTitle}}! - Here are your account details."
+  "welcomeAccount": "Welcome to {{siteTitle}}! - Here are your account details.",
+  "adminNewUserRegistered": "[{{siteTitle}}] New registration: {{fullname}}"
 }

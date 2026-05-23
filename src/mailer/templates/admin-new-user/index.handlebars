@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Neue Registrierung</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        h2 { margin-bottom: 4px; }
+        hr { border: none; border-top: 1px solid #ccc; margin: 12px 0; }
+        table { border-collapse: collapse; }
+        td { padding: 4px 12px 4px 0; vertical-align: top; }
+        .label { color: #888; }
+        .actions { margin-top: 16px; }
+        .actions a { color: #1976d2; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <h2>Neue Benutzerregistrierung</h2>
+    <hr />
+    <p>Ein neuer Benutzer hat sich registriert:</p>
+    <table>
+        <tr><td class="label">Name:</td><td>{{fullname}}</td></tr>
+        <tr><td class="label">Benutzername:</td><td>{{username}}</td></tr>
+        <tr><td class="label">E-Mail:</td><td>{{email}}</td></tr>
+        <tr><td class="label">Registriert am:</td><td>{{registeredAt}}</td></tr>
+    </table>
+    {{#if baseUrl}}
+    <p class="actions">
+        <a href="{{baseUrl}}/accounts">Benutzer in trudesk verwalten →</a>
+    </p>
+    {{/if}}
+</body>
+</html>
