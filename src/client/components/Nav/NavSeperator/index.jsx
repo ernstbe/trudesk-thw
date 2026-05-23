@@ -13,9 +13,21 @@
  */
 
 import React from 'react'
+import PropTypes from 'prop-types'
 
-const NavSeperator = () => {
+const NavSeperator = ({ label }) => {
+  if (label) {
+    return (
+      <li className='nav-section' aria-hidden='true'>
+        <span className='nav-section-label'>{label}</span>
+      </li>
+    )
+  }
   return <hr />
+}
+
+NavSeperator.propTypes = {
+  label: PropTypes.string
 }
 
 export default NavSeperator
