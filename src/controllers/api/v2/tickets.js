@@ -746,7 +746,7 @@ ticketsV2.getUserStats = async function (req, res) {
     const tickets = await Models.Ticket.getTicketsByRequester(userId)
     if (!tickets || tickets.length === 0) return apiUtils.sendApiError(res, 404, 'User has no tickets to report')
 
-    const closed = tickets.filter(t => t.status === 3)
+    const closed = tickets.filter(t => isResolvedStatus(t.status))
     return apiUtils.sendApiSuccess(res, {
       ticketCount: tickets.length,
       closedCount: closed.length,
@@ -756,6 +756,62 @@ ticketsV2.getUserStats = async function (req, res) {
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
+}
+
+// -------------------------------------------------------------------
+// Stats per assignee — GET /api/v2/tickets/stats/assignee/:user
+//
+// Workload view: counts tickets where the given user is the assignee
+// (not the requester). Returns ticketCount/closedCount based on the
+// status.isResolved flag (so custom statuses count correctly), plus an
+// avgResponse in hours computed from first-comment latency — matching
+// the shape of the global /stats endpoint so the PWA can render the
+// same per-user response-time column.
+// -------------------------------------------------------------------
+ticketsV2.getAssigneeStats = async function (req, res) {
+  const userId = req.params.user
+  if (!userId) return apiUtils.sendApiError(res, 400, 'Invalid User Id')
+
+  try {
+    const tickets = await Models.Ticket.find({ assignee: userId, deleted: false })
+      .populate('status')
+      .lean()
+      .exec()
+
+    const closed = (tickets || []).filter(t => isResolvedStatus(t.status))
+    const avgResponse = computeAvgResponseHours(tickets || [])
+
+    return apiUtils.sendApiSuccess(res, {
+      ticketCount: (tickets || []).length,
+      closedCount: closed.length,
+      avgResponse,
+      recentTickets: [...(tickets || [])].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-5)
+    })
+  } catch (err) {
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
+}
+
+function isResolvedStatus (status) {
+  if (status === null || status === undefined) return false
+  if (typeof status === 'object') return Boolean(status.isResolved)
+  // Legacy numeric status: 3 was the built-in "Closed" code.
+  return status === 3
+}
+
+function computeAvgResponseHours (tickets) {
+  const diffs = []
+  for (const t of tickets) {
+    if (!t.comments || t.comments.length === 0) continue
+    const ticketDate = new Date(t.date).getTime()
+    const firstComment = new Date(t.comments[0].date).getTime()
+    if (Number.isNaN(ticketDate) || Number.isNaN(firstComment)) continue
+    diffs.push((firstComment - ticketDate) / 1000)
+  }
+  if (diffs.length === 0) return 0
+  const totalSeconds = diffs.reduce((a, b) => a + b, 0)
+  return Math.floor(totalSeconds / diffs.length / 3600)
 }
 
 // -------------------------------------------------------------------

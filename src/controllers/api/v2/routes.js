@@ -56,6 +56,7 @@ module.exports = function (middleware, router, controllers) {
   router.get('/api/v2/tickets/stats', apiv2Auth, canUser('tickets:view'), apiv2.tickets.getStats)
   router.get('/api/v2/tickets/stats/group/:group', apiv2Auth, canUser('tickets:view'), apiv2.tickets.getGroupStats)
   router.get('/api/v2/tickets/stats/user/:user', apiv2Auth, canUser('tickets:view'), apiv2.tickets.getUserStats)
+  router.get('/api/v2/tickets/stats/assignee/:user', apiv2Auth, canUser('tickets:view'), apiv2.tickets.getAssigneeStats)
   router.get('/api/v2/tickets/stats/:timespan', apiv2Auth, canUser('tickets:view'), apiv2.tickets.getStats)
   router.post('/api/v2/tickets/transfer/:uid', apiv2Auth, isAdmin, apiv2.tickets.transferToThirdParty)
   router.get('/api/v2/tickets/:uid', apiv2Auth, canUser('tickets:view'), apiv2.tickets.single)
