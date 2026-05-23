@@ -299,25 +299,12 @@ apiUsers.createPublicAccount = async function (req, res) {
 
     const savedGroup = await group.save()
 
-    // Auto-add new users to all public groups and all teams so they can
-    // immediately see and create tickets. In a small org (THW-OV) every
-    // registered user belongs to the same groups/teams.
-    try {
-      const publicGroups = await GroupSchema.find({ public: true, _id: { $ne: savedGroup._id } })
-      for (const pg of publicGroups) {
-        pg.members.addToSet(savedUser._id)
-        await pg.save()
-      }
-
-      const TeamSchema = require('../../../models/team')
-      const allTeams = await TeamSchema.find({})
-      for (const team of allTeams) {
-        team.members.addToSet(savedUser._id)
-        await team.save()
-      }
-    } catch (autoAssignErr) {
-      winston.warn('Failed to auto-assign user to groups/teams: ' + autoAssignErr.message)
-    }
+    // New self-registered users get only their personal group + the default
+    // role from settings (typically "User"). Admins must manually add them to
+    // Support / other groups + teams before they get broader access. Earlier
+    // versions auto-added every new user to every public group and team — that
+    // was reverted because it implicitly granted Support-level visibility to
+    // anyone who registered.
 
     delete savedUser.password
     savedUser.password = undefined
