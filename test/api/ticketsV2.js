@@ -10,6 +10,7 @@ const superagent = require('superagent')
 //   GET    /api/v2/tickets/stats(/:timespan)
 //   GET    /api/v2/tickets/stats/group/:group
 //   GET    /api/v2/tickets/stats/user/:user
+//   GET    /api/v2/tickets/stats/assignee/:user
 //   DELETE /api/v2/tickets/batch
 //   GET    /api/v2/users/notifications
 //   GET    /api/v2/users/notifications/count
@@ -229,6 +230,18 @@ describe('api/v2/tickets + users (R3.3)', function () {
       expect(res.status).to.equal(200)
       expect(res.body.success).to.be.true
       expect(res.body.ticketCount).to.be.at.least(1)
+    })
+
+    it('returns assignee stats with zero counts when user has no assigned tickets', async function () {
+      // adminUserId is the requester of the fixture ticket, not the assignee,
+      // so this exercises the "no rows" path and confirms the endpoint still
+      // returns 200 (unlike /stats/user/:user which 404s on empty).
+      const res = await get('/api/v2/tickets/stats/assignee/' + adminUserId)
+      expect(res.status).to.equal(200)
+      expect(res.body.success).to.be.true
+      expect(res.body.ticketCount).to.equal(0)
+      expect(res.body.closedCount).to.equal(0)
+      expect(res.body.avgResponse).to.equal(0)
     })
   })
 
