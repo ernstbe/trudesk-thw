@@ -52,10 +52,25 @@ body > .side-nav-sub.tether-element
   top: 65px
   left: 0
   bottom: 0
+  display: flex
+  flex-direction: column
   //+boxShadow($sidebar_box_shadow)
   //+boxShadow(inset -1px 0 0 0 rgba(0,0,0,0.1))
   transition: width 0.2s ease
   z-index: 15
+
+  // Keep the bottom panel (lang switcher + collapse toggle) pinned: the items
+  // area scrolls inside, the toggle is always reachable without scrolling.
+  #side-nav-container
+    flex: 1 1 auto
+    min-height: 0
+    overflow-x: hidden
+    overflow-y: auto
+    &::-webkit-scrollbar
+      width: 0
+  .side-nav-bottom-panel
+    flex: 0 0 auto
+    border-top: 1px solid rgba(255,255,255,0.08)
   //border-right: $sidebar_border_right
   &:after
     content: ""
@@ -91,28 +106,40 @@ ul.side-nav
     margin: 5px 0
     background: darken($sidebar_bg, 10%)
 
+  // Section dividers. Collapsed rail (57px) shows just a thin centered line
+  // (~9px tall total) so groupings are visible without dead vertical space.
+  // Expanded rail (215px) inflates them into uppercase labels aligned with
+  // the item text column (not the icon column) so they read as group titles.
   li.nav-section
     list-style: none
-    margin: 14px 0 2px 0
-    padding: 8px 0 4px 20px
-    line-height: 1
+    margin: 4px 12px
+    padding: 0
     pointer-events: none
     user-select: none
-    border-top: 1px solid rgba(255,255,255,0.06)
     overflow: hidden
     white-space: nowrap
+    height: 0
+    border-top: 1px solid rgba(255,255,255,0.10)
     .nav-section-label
-      display: inline-block
-      color: rgba(255,255,255,0.42)
-      font-size: 10px
-      font-weight: 600
+      display: block
+      color: transparent
+      font-size: 0
+      line-height: 0
+      padding: 0
       text-transform: uppercase
-      letter-spacing: 0.1em
-      opacity: 0
-      transition: opacity .15s ease
+      font-weight: 600
+      transition: color .15s ease, font-size .15s ease, padding .15s ease
 
-.sidebar.expand ul.side-nav li.nav-section .nav-section-label
-  opacity: 1
+.sidebar.expand ul.side-nav li.nav-section
+  height: auto
+  margin: 12px 0 2px 0
+  border-top: none
+  .nav-section-label
+    color: rgba(255,255,255,0.6)
+    font-size: 10px
+    line-height: 1
+    letter-spacing: 0.1em
+    padding: 0 16px 6px 56px
 
   li
     font-size: 14px
@@ -154,7 +181,7 @@ ul.side-nav
           color: #fff
 
     &.active > a
-      padding-left: 55px !important
+      padding-left: 51px !important
       font-family: "Roboto", sans-serif !important
       background: $sidebar_item_active !important
       color: $sidebar_item_active_text !important
@@ -175,7 +202,9 @@ ul.side-nav
     color: $sidebar_text !important
     //border-left: 2px solid $sidebar_bg
     position: relative
-    padding-left: 60px !important
+    // Text starts at 56px; the absolutely-positioned icon occupies 18–40px
+    // (see the i,svg rule below), leaving an ~11px breathing gap to the label.
+    padding-left: 56px !important
     line-height: 48px
     height: 48px
 
@@ -217,17 +246,20 @@ ul.side-nav
         &.icon-invoices
           background-position: 0 -20px
 
+    // Force the icon into its own absolutely-positioned column so the item
+    // text never crowds it. Materialize's global rules occasionally win the
+    // cascade and reset position back to static — !important locks our intent.
     i,svg
-      line-height: 26px
-      margin-right: 15px
+      line-height: 1 !important
+      margin: 0 !important
       color: $sidebar_text
-      margin-top: 5px
-      position: absolute
-      top: 5px
-      left: 15px
+      position: absolute !important
+      top: 50% !important
+      left: 18px !important
+      transform: translateY(-50%) !important
       fill: $sidebar_text
     i
-      font-size: 24px !important
+      font-size: 22px !important
 
 ul.side-nav-sub
   @extend .side-nav
