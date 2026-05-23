@@ -61,45 +61,13 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
               active={activeItem === 'dashboard'}
             />
           )}
-          {sessionUser && Helpers.canUser('tickets:view') && (
-            <SidebarItem
-              text={t('nav.tickets')}
-              icon='assignment'
-              href='/tickets'
-              class='navTickets no-ajaxy'
-              hasSubmenu
-              subMenuTarget='tickets'
-              active={activeItem === 'tickets'}
-            >
-              <Submenu id='tickets'>
-                <SubmenuItem
-                  text={t('nav.ticketsActive')}
-                  icon='timer'
-                  href='/tickets/active'
-                  active={activeSubItem === 'tickets-active'}
-                />
-                <SubmenuItem
-                  text={t('nav.ticketsAssigned')}
-                  icon='assignment_ind'
-                  href='/tickets/assigned'
-                  active={activeSubItem === 'tickets-assigned'}
-                />
-                <SubmenuItem
-                  text={t('nav.ticketsUnassigned')}
-                  icon='person_add_disabled'
-                  href='/tickets/unassigned'
-                  active={activeSubItem === 'tickets-unassigned'}
-                />
-              </Submenu>
-            </SidebarItem>
-          )}
-          <SidebarItem
-            text={t('nav.messages')}
-            icon='chat'
-            href='/messages'
-            class='navMessages'
-            active={activeItem === 'messages'}
-          />
+          {/*
+            Tickets, Messages, Reports and Notices nav entries have been hidden:
+            the trudesk web UI is now the admin backoffice (see mainController.loginPost
+            admin gate), and the PWA is where Helfer/Bearbeiter view and work
+            tickets. The page routes still exist server-side, but nothing in the
+            admin nav links to them.
+          */}
           {sessionUser && Helpers.canUser('accounts:view') && (
             <SidebarItem
               text={t('nav.accounts')}
@@ -159,51 +127,7 @@ const Sidebar = ({ updateNavChange, activeItem, activeSubItem, sessionUser, noti
               active={activeItem === 'departments'}
             />
           )}
-          {sessionUser && Helpers.canUser('reports:view') && (
-            <SidebarItem
-              text={t('nav.reports')}
-              icon='assessment'
-              href='/reports/generate'
-              class='navReports no-ajaxy'
-              hasSubmenu
-              subMenuTarget='reports'
-              active={activeItem === 'reports'}
-            >
-              <Submenu id='reports'>
-                <SubmenuItem
-                  text={t('reports.generate')}
-                  icon='timeline'
-                  href='/reports/generate'
-                  active={activeSubItem === 'reports-generate'}
-                />
-                {/* <NavSeparator /> */}
-                {/* <SubmenuItem */}
-                {/*  text='Group Breakdown' */}
-                {/*  icon='supervisor_account' */}
-                {/*  href='/reports/breakdown/group' */}
-                {/*  active={activeSubItem === 'reports-breakdown-group'} */}
-                {/* /> */}
-                {/* <SubmenuItem */}
-                {/*  text='User Breakdown' */}
-                {/*  icon='perm_identity' */}
-                {/*  href='/reports/breakdown/user' */}
-                {/*  active={activeSubItem === 'reports-breakdown-user'} */}
-                {/* /> */}
-              </Submenu>
-            </SidebarItem>
-          )}
-
           {/* {renderPlugins()} */}
-
-          {sessionUser && Helpers.canUser('notices:view') && (
-            <SidebarItem
-              text={t('nav.notices')}
-              icon='campaign'
-              href='/notices'
-              class='navNotices'
-              active={activeItem === 'notices'}
-            />
-          )}
 
           {sessionUser && Helpers.canUser('settings:edit') && (
             <SidebarItem
