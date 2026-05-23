@@ -146,17 +146,22 @@ mainController.loginPost = async function (req, res, next) {
       }
 
       if (user) {
+        // Die trudesk-Web-Oberfläche ist für Admins reserviert. Alle anderen
+        // Rollen (Helfer, Bearbeiter ohne admin:*) nutzen die PWA — der
+        // API-Login (/api/v1/login, /api/v2/login) bleibt für sie offen.
+        if (!user.role || !user.role.isAdmin) {
+          req.flash(
+            'loginMessage',
+            'Die trudesk-Verwaltungsoberfläche ist nur für Administratoren. Bitte nutze die Ticket-App.'
+          )
+          return res.redirect('/')
+        }
+
         let redirectUrl = '/dashboard'
 
         if (req.session.redirectUrl) {
           redirectUrl = req.session.redirectUrl
           req.session.redirectUrl = null
-        }
-
-        // Non-admin/non-agent users land on the ticket list; agents and admins go to the dashboard.
-        // role is a populated Role document with virtuals — string compare against 'user' never matches.
-        if (req.user.role && !req.user.role.isAdmin && !req.user.role.isAgent) {
-          redirectUrl = '/tickets'
         }
 
         req.logIn(user, function (err) {
