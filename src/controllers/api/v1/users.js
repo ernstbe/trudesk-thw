@@ -309,6 +309,13 @@ apiUsers.createPublicAccount = async function (req, res) {
     delete savedUser.password
     savedUser.password = undefined
 
+    // Notify admins about the new registration. Don't block the response on
+    // mail delivery — failures (mailer disabled, SMTP down) must not turn a
+    // successful signup into a 400.
+    notifyAdminsOfNewRegistration(savedUser).catch(function (notifyErr) {
+      winston.warn('[trudesk:signup:notifyAdmins] ' + notifyErr.message)
+    })
+
     return res.json({
       success: true,
       userData: { user: savedUser, group: savedGroup }
@@ -317,6 +324,49 @@ apiUsers.createPublicAccount = async function (req, res) {
     winston.debug(err)
     return res.status(400).json({ success: false, error: err.message })
   }
+}
+
+async function notifyAdminsOfNewRegistration (newUser) {
+  const path = require('path')
+  const SettingSchema = require('../../../models/setting')
+  const mailer = require('../../../mailer')
+  const Email = require('email-templates')
+
+  const admins = await UserSchema.getAdmins({ limit: 1000 })
+  const recipients = [...new Set(
+    admins
+      .filter(function (a) { return a && a.email && !a.deleted && a._id.toString() !== newUser._id.toString() })
+      .map(function (a) { return a.email })
+  )]
+  if (recipients.length === 0) return
+
+  const siteUrlSetting = await SettingSchema.getSetting('gen:siteurl')
+  const siteUrl = siteUrlSetting && siteUrlSetting.value ? siteUrlSetting.value.replace(/\/$/, '') : ''
+
+  const templateDir = path.resolve(__dirname, '..', '..', '..', 'mailer', 'templates')
+  const emailRenderer = new Email({
+    views: { root: templateDir, options: { extension: 'handlebars' } }
+  })
+
+  const html = await emailRenderer.render('admin-new-user', {
+    fullname: newUser.fullname,
+    username: newUser.username,
+    email: newUser.email,
+    registeredAt: new Date().toLocaleString('de-DE'),
+    baseUrl: siteUrl
+  })
+
+  await new Promise(function (resolve, reject) {
+    mailer.sendMail({
+      to: recipients.join(','),
+      subject: require('../../../i18n').t('adminNewUserRegistered', { siteTitle: 'Trudesk', fullname: newUser.fullname }),
+      html,
+      generateTextFromHTML: true
+    }, function (err) {
+      if (err) return reject(err)
+      return resolve()
+    })
+  })
 }
 
 apiUsers.profileUpdate = async function (req, res) {
