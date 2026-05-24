@@ -39,6 +39,18 @@ const limiterConfigs = {
     points: 5, // signing up + email-check shouldn't burst
     duration: 60 * 60, // ...per hour
     blockDuration: 60 * 60
+  },
+  // Bug-report submit. Per-user (not per-IP) because the endpoint is
+  // authenticated and the whole org typically sits behind one NAT — IP-
+  // keying would let one buggy client block everyone. 5/hour is plenty
+  // for legitimate use; the FAB doesn't have a confirmation step and a
+  // user who hits this is either looping or malicious, neither of which
+  // we want fanning out admin push notifications.
+  bugReportSubmit: {
+    keyPrefix: 'bug_report_submit_per_user',
+    points: 5,
+    duration: 60 * 60,
+    blockDuration: 60 * 60
   }
 }
 
@@ -88,6 +100,16 @@ function clientIp (req) {
   return req.ip
 }
 
+function rejectWith429 (res, rlRejected, next) {
+  if (rlRejected instanceof Error) return next(rlRejected)
+  const secs = Math.round(rlRejected.msBeforeNext / 1000) || 1
+  res.set('Retry-After', String(secs))
+  return res.status(429).json({
+    success: false,
+    error: `Too many requests. Retry after ${secs} seconds.`
+  })
+}
+
 function wrap (name) {
   return function (req, res, next) {
     if (process.env.NODE_ENV === 'test') return next()
@@ -96,20 +118,32 @@ function wrap (name) {
     const ip = clientIp(req)
     limiter.consume(ip).then(
       () => next(),
-      (rlRejected) => {
-        if (rlRejected instanceof Error) return next(rlRejected)
-        const secs = Math.round(rlRejected.msBeforeNext / 1000) || 1
-        res.set('Retry-After', String(secs))
-        return res.status(429).json({
-          success: false,
-          error: `Too many requests. Retry after ${secs} seconds.`
-        })
-      }
+      (rlRejected) => rejectWith429(res, rlRejected, next)
+    )
+  }
+}
+
+// Per-user variant for authenticated endpoints where IP-keying would
+// punish whole-NAT'd orgs for one bad actor. Auth middleware must
+// have populated `req.user`; if not, we fail open (no limit applied)
+// rather than 500 — the auth middleware itself should reject unauth'd
+// requests before this runs.
+function wrapByUser (name) {
+  return function (req, res, next) {
+    if (process.env.NODE_ENV === 'test') return next()
+    if (!req.user || !req.user._id) return next()
+
+    const limiter = getLimiter(name)
+    const key = String(req.user._id)
+    limiter.consume(key).then(
+      () => next(),
+      (rlRejected) => rejectWith429(res, rlRejected, next)
     )
   }
 }
 
 module.exports = {
   apiLogin: wrap('apiLogin'),
-  publicRegister: wrap('publicRegister')
+  publicRegister: wrap('publicRegister'),
+  bugReportSubmit: wrapByUser('bugReportSubmit')
 }
