@@ -121,6 +121,17 @@ const init = function (tickets, resolvedIds, callback) {
         if (tickets) {
           $tickets = JSON.parse(JSON.stringify(tickets))
 
+          // After JSON-roundtrip `t.date` becomes an ISO string. The
+          // subsequent window filters compare `t.date > tXXX` where
+          // `tXXX` is a number from `dayjs.toDate().getTime()` — string
+          // vs number coerces both sides to NaN and the filter always
+          // returns false, so e180/e90/e60/e30 silently see an empty
+          // `$tickets` and zero everything. Normalize to ms timestamps
+          // once here so the filters can compare numerically.
+          for (let i = 0; i < $tickets.length; i++) {
+            $tickets[i]._ts = new Date($tickets[i].date).getTime()
+          }
+
           return done()
         }
 
@@ -129,6 +140,9 @@ const init = function (tickets, resolvedIds, callback) {
           if (err) return done(err)
 
           $tickets = tickets
+          for (let i = 0; i < $tickets.length; i++) {
+            $tickets[i]._ts = new Date($tickets[i].date).getTime()
+          }
 
           return done()
         })
@@ -153,7 +167,7 @@ const init = function (tickets, resolvedIds, callback) {
                   // Remove all tickets more than 180 days
                   const t180 = e180.toDate().getTime()
                   $tickets = $tickets.filter(function (t) {
-                    return t.date > t180
+                    return t._ts > t180
                   })
 
                   return c()
@@ -176,7 +190,7 @@ const init = function (tickets, resolvedIds, callback) {
                   // Remove all tickets more than 90 days
                   const t90 = e90.toDate().getTime()
                   $tickets = $tickets.filter(function (t) {
-                    return t.date > t90
+                    return t._ts > t90
                   })
 
                   return c()
@@ -199,7 +213,7 @@ const init = function (tickets, resolvedIds, callback) {
                   // Remove all tickets more than 60 days
                   const t60 = e60.toDate().getTime()
                   $tickets = $tickets.filter(function (t) {
-                    return t.date > t60
+                    return t._ts > t60
                   })
 
                   return c()
@@ -222,7 +236,7 @@ const init = function (tickets, resolvedIds, callback) {
                   // Remove all tickets more than 30 days
                   const t30 = e30.toDate().getTime()
                   $tickets = $tickets.filter(function (t) {
-                    return t.date > t30
+                    return t._ts > t30
                   })
 
                   return c()
