@@ -41,7 +41,7 @@ function * createDepartment ({ payload }) {
   try {
     const response = yield call(api.departments.create, payload)
     yield put({ type: CREATE_DEPARTMENT.SUCCESS, response })
-    yield put({ type: HIDE_MODAL })
+    yield put({ type: HIDE_MODAL.ACTION })
   } catch (error) {
     const errorText = error.response ? error.response.data.error : error
     helpers.UI.showSnackbar(`Error: ${errorText}`, true)
@@ -54,7 +54,7 @@ function * updateDepartment ({ payload }) {
   try {
     const response = yield call(api.departments.update, payload)
     yield put({ type: UPDATE_DEPARTMENT.SUCCESS, response })
-    yield put({ type: HIDE_MODAL })
+    yield put({ type: HIDE_MODAL.ACTION })
   } catch (error) {
     const errorText = error.response ? error.response.data.error : error
     helpers.UI.showSnackbar(`Error: ${errorText}`, true)
