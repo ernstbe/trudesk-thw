@@ -248,6 +248,55 @@ async function migrateStatusInProgress () {
   )
 }
 
+// Idempotent counterpart to the legacy `removeAgentsFromGroups` migration
+// (which only ran for the v1.0.11 upgrade path). Groups are a customer-side
+// concept — agents and admins see every ticket anyway via the role-based
+// branch in apiGroups.get, so their presence in a group's members array is
+// at best redundant and at worst pollutes sendMailTo and the new PWA group
+// filter dropdown with people who don't belong there.
+//
+// Promotions happen at runtime (admin flips a user from "user" to "support"
+// via the accounts API), but the existing update path does NOT strip group
+// memberships, so the staleness accumulates. Running this on every boot
+// keeps the invariant `(member.role is User) for every group.member` true
+// without needing a separate manual cleanup script.
+async function stripAgentsFromGroups () {
+  const groupSchema = require('../models/group')
+  const groups = await groupSchema.getAllGroups()
+
+  let touched = 0
+  let removedMembers = 0
+  let removedMail = 0
+
+  for (const group of groups) {
+    const beforeMembers = group.members.length
+    const beforeMail = group.sendMailTo.length
+
+    // `role` is autopopulated on User (see user.js findOne/find hook), so
+    // `member.role.isAdmin` / `.isAgent` resolve via the role virtual that
+    // reads the global.roles cache populated by permissions.register().
+    group.members = group.members.filter(m => !m.role.isAdmin && !m.role.isAgent)
+    group.sendMailTo = group.sendMailTo.filter(m => !m.role.isAdmin && !m.role.isAgent)
+
+    const droppedMembers = beforeMembers - group.members.length
+    const droppedMail = beforeMail - group.sendMailTo.length
+
+    if (droppedMembers === 0 && droppedMail === 0) continue
+
+    await group.save()
+    touched++
+    removedMembers += droppedMembers
+    removedMail += droppedMail
+    winston.info(
+      `stripAgentsFromGroups: "${group.name}" — removed ${droppedMembers} agent member(s), ${droppedMail} mail recipient(s)`
+    )
+  }
+
+  if (touched > 0) {
+    winston.info(`stripAgentsFromGroups: cleaned ${touched} group(s), ${removedMembers} member(s), ${removedMail} mail recipient(s)`)
+  }
+}
+
 function createTicketStatus (callback) {
   const Status = require('../models/ticketStatus')
   const counterSchema = require('../models/counters')
@@ -405,6 +454,14 @@ migrations.run = function (callback) {
           .then(() => next())
           .catch(err => {
             winston.warn('migrateStatusInProgress failed: ' + err.message)
+            return next()
+          })
+      },
+      function (next) {
+        stripAgentsFromGroups()
+          .then(() => next())
+          .catch(err => {
+            winston.warn('stripAgentsFromGroups failed: ' + err.message)
             return next()
           })
       }
