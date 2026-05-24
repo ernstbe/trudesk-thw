@@ -83,7 +83,20 @@ function buildAvgResponse (ticketArray, callback) {
   return callback(cbObj)
 }
 
-const init = function (tickets, callback) {
+// `resolvedIds` is a Set<string> of Status._id values whose isResolved
+// flag is true. Closed-ticket counts are computed by Set membership
+// instead of the legacy `t.status === 3` check (numeric statuses were
+// migrated to ObjectId refs in v1.2.8). Kept optional for back-compat
+// with the in-file fallback path — missing/empty Set just zeros the
+// closed counts.
+const init = function (tickets, resolvedIds, callback) {
+  if (typeof resolvedIds === 'function') {
+    callback = resolvedIds
+    resolvedIds = new Set()
+  }
+  const resolved = resolvedIds || new Set()
+  const isClosed = (t) => resolved.has(String(t.status))
+
   let $tickets = []
   ex.e30 = {}
   ex.e60 = {}
@@ -126,9 +139,7 @@ const init = function (tickets, callback) {
             e365: function (c) {
               ex.e365.tickets = $tickets
 
-              ex.e365.closedTickets = ex.e365.tickets.map(t => t.status).filter(function (v) {
-                return v === 3
-              })
+              ex.e365.closedTickets = ex.e365.tickets.filter(isClosed)
 
               buildGraphData(ex.e365.tickets, 365, function (graphData) {
                 ex.e365.graphData = graphData
@@ -152,9 +163,7 @@ const init = function (tickets, callback) {
             e180: function (c) {
               ex.e180.tickets = $tickets
 
-              ex.e180.closedTickets = ex.e180.tickets.map(t => t.status).filter(function (v) {
-                return v === 3
-              })
+              ex.e180.closedTickets = ex.e180.tickets.filter(isClosed)
 
               buildGraphData(ex.e180.tickets, 180, function (graphData) {
                 ex.e180.graphData = graphData
@@ -177,9 +186,7 @@ const init = function (tickets, callback) {
             e90: function (c) {
               ex.e90.tickets = $tickets
 
-              ex.e90.closedTickets = ex.e90.tickets.map(t => t.status).filter(function (v) {
-                return v === 3
-              })
+              ex.e90.closedTickets = ex.e90.tickets.filter(isClosed)
 
               buildGraphData(ex.e90.tickets, 90, function (graphData) {
                 ex.e90.graphData = graphData
@@ -202,9 +209,7 @@ const init = function (tickets, callback) {
             e60: function (c) {
               ex.e60.tickets = $tickets
 
-              ex.e60.closedTickets = ex.e60.tickets.map(t => t.status).filter(function (v) {
-                return v === 3
-              })
+              ex.e60.closedTickets = ex.e60.tickets.filter(isClosed)
 
               buildGraphData(ex.e60.tickets, 60, function (graphData) {
                 ex.e60.graphData = graphData
@@ -227,9 +232,7 @@ const init = function (tickets, callback) {
             e30: function (c) {
               ex.e30.tickets = $tickets
 
-              ex.e30.closedTickets = ex.e30.tickets.map(t => t.status).filter(function (v) {
-                return v === 3
-              })
+              ex.e30.closedTickets = ex.e30.tickets.filter(isClosed)
 
               buildGraphData(ex.e30.tickets, 30, function (graphData) {
                 ex.e30.graphData = graphData
