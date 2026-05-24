@@ -201,7 +201,7 @@ function * createRole ({ payload }) {
     const response = yield call(api.settings.createRole, payload)
     yield put({ type: CREATE_ROLE.SUCCESS, response })
     yield put({ type: FETCH_ROLES.ACTION })
-    yield put({ type: HIDE_MODAL })
+    yield put({ type: HIDE_MODAL.ACTION })
   } catch (error) {
     const errorText = error.response.data.error
     helpers.UI.showSnackbar(`Error: ${errorText}`, true)
@@ -214,7 +214,7 @@ function * deleteRole ({ payload }) {
     const response = yield call(api.settings.deleteRole, payload)
     yield put({ type: DELETE_ROLE.SUCCESS, response })
     yield put({ type: FETCH_ROLES.ACTION })
-    yield put({ type: HIDE_MODAL })
+    yield put({ type: HIDE_MODAL.ACTION })
     helpers.UI.showSnackbar('Role successfully deleted')
   } catch (error) {
     const errorText = error.response.data.error
