@@ -24,7 +24,6 @@ import NoticeBanner from 'components/NoticeBanner'
 import NotificationsDropdownPartial from './notificationsDropdown'
 
 import ProfileDropdownPartial from 'containers/Topbar/profileDropdown'
-import ConversationsDropdownPartial from 'containers/Topbar/conversationsDropdown'
 import OnlineUserListPartial from 'containers/Topbar/onlineUserList'
 
 import helpers from 'lib/helpers'
@@ -44,7 +43,6 @@ function TopbarContainer ({
   notice,
   t
 }) {
-  const conversationsDropdownPartial = useRef(null)
   const notificationsDropdownPartial = useRef(null)
   const profileDropdownPartial = useRef(null)
 
@@ -118,9 +116,6 @@ function TopbarContainer ({
       socket.off(NOTICE_UI_CLEAR, onSocketClearNotice)
     }
   }, [socket])
-  const onConversationsClicked = (e) => {
-    e.preventDefault()
-  }
 
   if (loadingViewData || !sessionUser) return <div />
   return (
@@ -137,35 +132,12 @@ function TopbarContainer ({
             <section className='top-bar-section uk-clearfix'>
               <div className='top-menu uk-float-right'>
                 <ul className='uk-subnav uk-margin-bottom-remove'>
-                  {/* Start Create Ticket Perm */}
-                  {sessionUser && helpers.canUser('tickets:create') && (
-                    <li className='top-bar-icon nopadding'>
-                      <button
-                        title={t('topbar.createTicket')}
-                        className='anchor'
-                        onClick={() => showModalAction('CREATE_TICKET')}
-                      >
-                        <i className='material-icons'>&#xE145;</i>
-                      </button>
-                    </li>
-                  )}
-                  {sessionUser && helpers.canUser('tickets:create') && (
-                    <li className='top-bar-icon nopadding nohover'>
-                      <i className='material-icons separator'>remove</i>
-                    </li>
-                  )}
-                  {/* End Create Ticket Perm */}
-                  <li className='top-bar-icon'>
-                    <PDropdownTrigger target={conversationsDropdownPartial}>
-                      <a
-                        title={t('topbar.conversations')}
-                        className='no-ajaxy uk-vertical-align'
-                        onClick={e => onConversationsClicked(e)}
-                      >
-                        <i className='material-icons'>question_answer</i>
-                      </a>
-                    </PDropdownTrigger>
-                  </li>
+                  {/* Create-Ticket button and Conversations dropdown removed
+                      on purpose: the admin web UI is for back-office work
+                      (Groups/Teams/Sections/Settings). End users create and
+                      discuss tickets from the PWA at the main domain; the
+                      admin icons were redundant entry points that confused
+                      new admins more than they helped. */}
                   <li className='top-bar-icon'>
                     <PDropdownTrigger target={notificationsDropdownPartial}>
                       <a title={t('topbar.notifications')} className='no-ajaxy uk-vertical-align'>
@@ -246,12 +218,6 @@ function TopbarContainer ({
                   shortDateFormat={viewdata.get('shortDateFormat')}
                   timezone={viewdata.get('timezone')}
                   onViewAllNotificationsClick={() => showModalAction('VIEW_ALL_NOTIFICATIONS')}
-                />
-                <ConversationsDropdownPartial
-                  ref={conversationsDropdownPartial}
-                  shortDateFormat={viewdata.get('shortDateFormat')}
-                  timezone={viewdata.get('timezone')}
-                  socket={socket}
                 />
                 <ProfileDropdownPartial ref={profileDropdownPartial} />
               </div>
