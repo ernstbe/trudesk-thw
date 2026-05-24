@@ -130,17 +130,15 @@ ul.side-nav
       font-weight: 600
       transition: color .15s ease, font-size .15s ease, padding .15s ease
 
-.sidebar.expand ul.side-nav li.nav-section
-  height: auto
-  margin: 12px 0 2px 0
-  border-top: none
-  .nav-section-label
-    color: rgba(255,255,255,0.6)
-    font-size: 10px
-    line-height: 1
-    letter-spacing: 0.1em
-    padding: 0 16px 6px 56px
-
+  // ─── Normal nav items ──────────────────────────────────────────────
+  // These rules MUST live inside the `ul.side-nav` block (sibling of
+  // `li.nav-section` above) so they compile to `ul.side-nav li` and
+  // `ul.side-nav a`. PR #84 inserted a `.sidebar.expand ul.side-nav
+  // li.nav-section` top-level block above this point, and the
+  // subsequent 2-space-indented blocks silently re-parented into that
+  // section scope — `ul.side-nav a` disappeared from the compiled CSS,
+  // the generic `a { color: red }` rule won, and the rail's
+  // implicit-clip padding stopped applying. Keep this 2-space indent.
   li
     font-size: 14px
     font-family: "Roboto", sans-serif
@@ -204,6 +202,9 @@ ul.side-nav
     position: relative
     // Text starts at 56px; the absolutely-positioned icon occupies 18–40px
     // (see the i,svg rule below), leaving an ~11px breathing gap to the label.
+    // In rail mode the sidebar is 57px wide with overflow:hidden — this
+    // padding is also what keeps the label clipped off-screen until
+    // `.sidebar.expand` widens the rail to 215px.
     padding-left: 56px !important
     line-height: 48px
     height: 48px
@@ -260,6 +261,21 @@ ul.side-nav
       fill: $sidebar_text
     i
       font-size: 22px !important
+
+// Section dividers — expanded variant. Pulled to top-level (sibling of
+// `ul.side-nav`) on purpose so the `.sidebar.expand` qualifier doesn't
+// have to be duplicated by nesting; this is a pure override of the
+// collapsed default declared inside `ul.side-nav li.nav-section` above.
+.sidebar.expand ul.side-nav li.nav-section
+  height: auto
+  margin: 12px 0 2px 0
+  border-top: none
+  .nav-section-label
+    color: rgba(255,255,255,0.6)
+    font-size: 10px
+    line-height: 1
+    letter-spacing: 0.1em
+    padding: 0 16px 6px 56px
 
 ul.side-nav-sub
   @extend .side-nav
