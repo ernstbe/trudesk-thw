@@ -68,21 +68,44 @@ truCache.refreshCache = function (callback) {
   async.waterfall(
     [
       function (done) {
+        // `getForCache` was converted to `async function` during the
+        // Mongoose 8 upgrade (commit 049fdcb9). The legacy `(err, tickets)`
+        // callback below was never invoked — getForCache returned a
+        // Promise that floated unawaited, the waterfall hung on this
+        // first step, and zero `cache.set` calls ever fired. The dashboard
+        // endpoint then returned `{lastUpdated}` only (the response handler
+        // does `dayjs.utc(undefined)` = now as a fallback) and every other
+        // value 0 → that's exactly what prod has been showing. Bridge the
+        // Promise back to the waterfall callback shape.
         const ticketSchema = require('../models/ticket')
-        ticketSchema.getForCache(function (e, tickets) {
-          if (e) return done(e)
-          winston.debug('Pulled ' + tickets.length)
-
-          return done(null, tickets)
-        })
+        ticketSchema.getForCache()
+          .then(tickets => {
+            winston.debug('Pulled ' + tickets.length)
+            return done(null, tickets)
+          })
+          .catch(e => done(e))
+      },
+      function (tickets, done) {
+        // Resolved-status IDs for ticketStats' closedCount. Statuses
+        // moved from numeric `0|1|2|3` to ObjectId refs in the v1.2.8
+        // migration; the old `=== 3` filter in ticketStats stopped
+        // matching anything. Fetch once here and pass through so the
+        // child process doesn't hit Mongo five times.
+        const Status = require('../models/ticketStatus')
+        Status.find({ isResolved: true }, '_id').lean()
+          .then(rows => {
+            const resolvedIds = new Set(rows.map(r => String(r._id)))
+            return done(null, tickets, resolvedIds)
+          })
+          .catch(e => done(e))
       },
 
-      function (tickets, cb) {
+      function (tickets, resolvedIds, cb) {
         async.parallel(
           [
             function (done) {
               const ticketStats = require('./ticketStats')
-              ticketStats(tickets, function (err, stats) {
+              ticketStats(tickets, resolvedIds, function (err, stats) {
                 if (err) return done(err)
                 const expire = 3600 // 1 hour
                 cache.set('tickets:overview:lastUpdated', stats.lastUpdated, expire)
