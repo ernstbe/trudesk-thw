@@ -256,8 +256,31 @@ accountsApi.update = async function (req, res) {
 
     // GROUPS
     let groups = []
-    if (!postData.groups) groups = await Group.getAllGroupsOfUser(postData._id)
-    else {
+    // Companion to the stripAgentsFromGroups boot migration: if the request
+    // results in an agent/admin role, clean group memberships immediately
+    // instead of waiting for the next server restart. Any `postData.groups`
+    // in the request is ignored on this path — re-adding the user to
+    // customer-side groups would just be re-creating the staleness we're
+    // here to prevent.
+    const newRoleIsElevated = populatedUser.role.isAdmin || populatedUser.role.isAgent
+    if (newRoleIsElevated) {
+      const allGroups = await Group.getAllGroups()
+      for (const g of allGroups) {
+        let touched = false
+        if (g.isMember(postData._id)) {
+          await g.removeMember(postData._id)
+          touched = true
+        }
+        if (Array.isArray(g.sendMailTo) && g.sendMailTo.find(m => String(m._id) === String(postData._id))) {
+          await g.removeSendMailTo(postData._id)
+          touched = true
+        }
+        if (touched) await g.save()
+      }
+      // groups stays empty — response correctly reflects no membership.
+    } else if (!postData.groups) {
+      groups = await Group.getAllGroupsOfUser(postData._id)
+    } else {
       const allGroups = await Group.getAllGroups()
       for (const g of allGroups) {
         if (postData.groups.includes(g._id.toString())) {
