@@ -92,6 +92,47 @@ describe('middleware/rateLimits', function () {
     expect(outcome).to.equal('next')
   })
 
+  it('bugReportSubmit blocks at 6th call per user (5/hour)', async function () {
+    const req = { ip: '10.99.0.30', headers: {}, user: { _id: 'user-aaa' } }
+    for (let i = 0; i < 5; i++) {
+      const res = fakeRes()
+      const outcome = await run(rateLimits.bugReportSubmit, req, res)
+      expect(outcome).to.equal('next', `attempt ${i + 1} should pass`)
+    }
+    const res = fakeRes()
+    const outcome = await run(rateLimits.bugReportSubmit, req, res)
+    expect(outcome).to.equal('blocked')
+    expect(res.statusCode).to.equal(429)
+    expect(res._headers).to.have.property('Retry-After')
+  })
+
+  it('bugReportSubmit keys on user._id, not IP', async function () {
+    // Same IP, different user — must be tracked separately.
+    const ipSameForAll = '10.99.0.31'
+    const reqA = { ip: ipSameForAll, headers: {}, user: { _id: 'user-bbb' } }
+    const reqB = { ip: ipSameForAll, headers: {}, user: { _id: 'user-ccc' } }
+
+    // Burn user A's budget.
+    for (let i = 0; i < 5; i++) await run(rateLimits.bugReportSubmit, reqA, fakeRes())
+    const blockedRes = fakeRes()
+    await run(rateLimits.bugReportSubmit, reqA, blockedRes)
+    expect(blockedRes.statusCode, 'user A blocked').to.equal(429)
+
+    // user B on the same IP is independent.
+    const freshRes = fakeRes()
+    const outcome = await run(rateLimits.bugReportSubmit, reqB, freshRes)
+    expect(outcome).to.equal('next')
+  })
+
+  it('bugReportSubmit fails open when req.user is missing', async function () {
+    // Auth middleware should reject before we get here, but if we somehow do,
+    // fail open rather than 500. (Verifying we don't crash on undefined user.)
+    const req = { ip: '10.99.0.32', headers: {} }
+    const res = fakeRes()
+    const outcome = await run(rateLimits.bugReportSubmit, req, res)
+    expect(outcome).to.equal('next')
+  })
+
   it('publicRegister limits more aggressively (5/hour)', async function () {
     const req = fakeReq('10.99.0.20')
     for (let i = 0; i < 5; i++) {

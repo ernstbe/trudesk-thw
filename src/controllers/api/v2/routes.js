@@ -178,8 +178,8 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v2/account/push/subscribe', apiv2Auth, apiv1.pushSubscriptions.subscribe)
   router.delete('/api/v2/account/push/subscribe', apiv2Auth, apiv1.pushSubscriptions.unsubscribe)
 
-  // Bug reports
-  router.post('/api/v2/bug-reports', apiv2Auth, apiv1.bugReports.submit)
+  // Bug reports — submit is rate-limited per-user (5/h); see v1 routes for rationale.
+  router.post('/api/v2/bug-reports', apiv2Auth, rateLimits.bugReportSubmit, apiv1.bugReports.submit)
   router.get('/api/v2/bug-reports', apiv2Auth, apiv1.bugReports.list)
   router.patch('/api/v2/bug-reports/:id', apiv2Auth, apiv1.bugReports.setResolved)
   router.delete('/api/v2/bug-reports/:id', apiv2Auth, apiv1.bugReports.remove)

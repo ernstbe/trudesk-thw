@@ -46,7 +46,10 @@ module.exports = function (middleware, router, controllers) {
   router.delete('/api/v1/account/push/subscribe', apiv1, apiCtrl.pushSubscriptions.unsubscribe)
 
   // Bug reports — submit from any authed user, admin-only read/patch/delete.
-  router.post('/api/v1/bug-reports', apiv1, apiCtrl.bugReports.submit)
+  // Submit is rate-limited per-user (5/h): the PWA FAB has no confirmation
+  // step, so a stuck client or angry tester can otherwise fan out 50 admin
+  // push notifications in a minute.
+  router.post('/api/v1/bug-reports', apiv1, rateLimits.bugReportSubmit, apiCtrl.bugReports.submit)
   router.get('/api/v1/bug-reports', apiv1, apiCtrl.bugReports.list)
   router.patch('/api/v1/bug-reports/:id', apiv1, apiCtrl.bugReports.setResolved)
   router.delete('/api/v1/bug-reports/:id', apiv1, apiCtrl.bugReports.remove)
