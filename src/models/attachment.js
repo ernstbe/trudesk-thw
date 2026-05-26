@@ -20,7 +20,12 @@ const attachmentSchema = mongoose.Schema({
   name: { type: String, required: true },
   date: { type: Date, required: true, default: Date.now },
   path: { type: String, required: true },
-  type: { type: String, required: true }
+  type: { type: String, required: true },
+  // Optional — only populated by the new API-token upload endpoint
+  // (api/v1/tickets uploadAttachment). Legacy attachments from the
+  // session-cookie /tickets/uploadattachment route leave this at 0,
+  // which the PWA renders as "0 B". Not required, so old docs validate.
+  size: { type: Number, default: 0 }
 })
 
 attachmentSchema.pre('save', function () {

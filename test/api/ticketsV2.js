@@ -315,6 +315,9 @@ describe('api/v2/tickets + users (R3.3)', function () {
       // sharp converts to JPEG, so the stored attachment must reflect that.
       expect(res.body.attachment.type).to.equal('image/jpeg')
       expect(res.body.attachment.name).to.match(/\.jpg$/)
+      // size is set on the stored buffer length so clients can render
+      // a "324 KB" badge without a second HEAD request.
+      expect(res.body.attachment.size).to.be.a('number').and.greaterThan(0)
       expect(res.body.ticket.attachments.length).to.be.at.least(1)
     })
 

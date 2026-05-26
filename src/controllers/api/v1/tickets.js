@@ -1993,7 +1993,8 @@ apiTickets.uploadAttachment = function (req, res) {
         owner: user._id,
         name: storedName,
         path: '/uploads/tickets/' + ticketId + '/attachment_' + storedName,
-        type: finalMime
+        type: finalMime,
+        size: buffer.length
       })
       ticket.history.push({
         action: 'ticket:added:attachment',
