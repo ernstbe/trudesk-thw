@@ -184,8 +184,12 @@ module.exports = function (middleware, router, controllers) {
   router.patch('/api/v2/bug-reports/:id', apiv2Auth, apiv1.bugReports.setResolved)
   router.delete('/api/v2/bug-reports/:id', apiv2Auth, apiv1.bugReports.remove)
 
-  // Attachment remove — same path shape as v1 so the PWA can migrate
-  // without rewriting the URL builder.
+  // Attachment upload + remove — same path shape as v1 so the PWA can
+  // migrate without rewriting the URL builder. The upload route runs
+  // under apiv2Auth so it works with Bearer JWTs and the v1-accesstoken
+  // fallback — no session cookie / CSRF token needed (unlike the legacy
+  // /tickets/uploadattachment route).
+  router.post('/api/v2/tickets/:tid/attachments', apiv2Auth, apiv1.tickets.uploadAttachment)
   router.delete('/api/v2/tickets/:tid/attachments/remove/:aid', apiv2Auth, apiv1.tickets.removeAttachment)
 
   // Notifications — v1 bolted these onto /users/notifications because of
