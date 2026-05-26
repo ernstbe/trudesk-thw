@@ -368,6 +368,9 @@ apiTickets.create = async function (req, res) {
 
   const postData = req.body
   if (!(typeof postData === 'object' && postData !== null) || !postData.subject || !postData.issue) { return res.status(400).json({ success: false, error: 'Invalid Post Data' }) }
+  if (!postData.group) {
+    return res.status(400).json({ success: false, error: 'Invalid Post Data: group is required' })
+  }
 
   const socketId = postData.socketId === undefined ? '' : postData.socketId
 
@@ -393,6 +396,24 @@ apiTickets.create = async function (req, res) {
       response.success = false
       response.error = 'Invalid User'
       return res.status(400).json(response)
+    }
+
+    // Verify the user is actually allowed to file into the requested group.
+    // Mirrors the visibility logic used by ticketsV2.single and accountsApi.sessionUser.
+    const DepartmentSchema = require('../../../models/department')
+    const GroupSchema = require('../../../models/group')
+    let allowedGroupIds
+    if (req.user.role.isAdmin || req.user.role.isAgent) {
+      const dbGroups = await DepartmentSchema.getDepartmentGroupsOfUser(req.user._id)
+      allowedGroupIds = dbGroups.map(g => g._id.toString())
+    } else {
+      const dbGroups = await GroupSchema.getAllGroupsOfUser(req.user._id)
+      allowedGroupIds = dbGroups.map(g => g._id.toString())
+    }
+    if (!allowedGroupIds.includes(postData.group.toString())) {
+      response.success = false
+      response.error = 'Forbidden: group not accessible to this user'
+      return res.status(403).json(response)
     }
 
     const HistoryItem = {
