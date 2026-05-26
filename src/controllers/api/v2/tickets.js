@@ -31,10 +31,29 @@ ticketsV2.create = async function (req, res) {
   if (!postData || !postData.subject) {
     return apiUtils.sendApiError(res, 400, 'Invalid Post Data: subject is required')
   }
+  if (!postData.group) {
+    return apiUtils.sendApiError(res, 400, 'Invalid Post Data: group is required')
+  }
 
   try {
     const user = await Models.User.findOne({ _id: req.user._id })
     if (!user || user.deleted) return apiUtils.sendApiError(res, 400, 'Invalid User')
+
+    // Verify the user is actually allowed to file into the requested group.
+    // Mirrors the visibility logic used by ticketsV2.single and accountsApi.sessionUser:
+    // admins/agents see groups reachable via their team→department mapping, everyone
+    // else only sees groups they are a direct member of.
+    let allowedGroupIds
+    if (req.user.role.isAdmin || req.user.role.isAgent) {
+      const dbGroups = await Models.Department.getDepartmentGroupsOfUser(req.user._id)
+      allowedGroupIds = dbGroups.map(g => g._id.toString())
+    } else {
+      const dbGroups = await Models.Group.getAllGroupsOfUser(req.user._id)
+      allowedGroupIds = dbGroups.map(g => g._id.toString())
+    }
+    if (!allowedGroupIds.includes(postData.group.toString())) {
+      return apiUtils.sendApiError(res, 403, 'Forbidden: group not accessible to this user')
+    }
 
     const status = await resolveDefaultTicketStatus()
     if (!status) return apiUtils.sendApiError(res, 500, 'No default ticket status configured')
