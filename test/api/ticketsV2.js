@@ -265,6 +265,73 @@ describe('api/v2/tickets + users (R3.3)', function () {
   })
 
   // ------------------------------------------------------------------
+  // Attachment upload — POST /api/v2/tickets/:tid/attachments
+  // ------------------------------------------------------------------
+  describe('POST /api/v2/tickets/:tid/attachments', function () {
+    // 1x1 transparent PNG — small enough to keep the test fast, big enough
+    // to exercise the sharp resize path (the image is below the 2400px
+    // threshold so sharp passes it through, but still converts to JPEG).
+    const onePxPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGD4DwABBAEAfb' +
+      'rDwgAAAABJRU5ErkJggg==',
+      'base64'
+    )
+
+    function uploadAttachment (path, buf, filename, mime) {
+      return new Promise(function (resolve) {
+        agent
+          .post(baseUrl + path)
+          .attach('file', buf, { filename, contentType: mime })
+          .ok(function () { return true })
+          .end(function (err, res) { resolve(err ? { status: err.status || 0, body: {} } : res) })
+      })
+    }
+
+    it('rejects an upload with no file in the body', async function () {
+      const res = await post('/api/v2/tickets/' + ticketId + '/attachments', {})
+      expect(res.status).to.equal(400)
+    })
+
+    it('rejects an upload with a disallowed mime/extension', async function () {
+      const res = await uploadAttachment(
+        '/api/v2/tickets/' + ticketId + '/attachments',
+        Buffer.from('<script>alert(1)</script>'),
+        'evil.html',
+        'text/html'
+      )
+      expect(res.status).to.equal(400)
+    })
+
+    it('stores a PNG, resizes it to JPEG, and appends to ticket.attachments', async function () {
+      const res = await uploadAttachment(
+        '/api/v2/tickets/' + ticketId + '/attachments',
+        onePxPng,
+        'pixel.png',
+        'image/png'
+      )
+      expect(res.status).to.equal(200)
+      expect(res.body.success).to.be.true
+      expect(res.body.attachment).to.be.a('object')
+      // sharp converts to JPEG, so the stored attachment must reflect that.
+      expect(res.body.attachment.type).to.equal('image/jpeg')
+      expect(res.body.attachment.name).to.match(/\.jpg$/)
+      expect(res.body.ticket.attachments.length).to.be.at.least(1)
+    })
+
+    it('returns 404 for an unknown ticket id', async function () {
+      // Valid-looking but non-existing ObjectId
+      const fakeId = '000000000000000000000000'
+      const res = await uploadAttachment(
+        '/api/v2/tickets/' + fakeId + '/attachments',
+        onePxPng,
+        'pixel.png',
+        'image/png'
+      )
+      expect(res.status).to.equal(404)
+    })
+  })
+
+  // ------------------------------------------------------------------
   // Batch delete — last so it doesn't affect the other tests' fixture
   // ------------------------------------------------------------------
   describe('DELETE /api/v2/tickets/batch', function () {

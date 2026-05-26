@@ -1829,6 +1829,191 @@ apiTickets.removeAttachment = async function (req, res) {
   }
 }
 
+// Mime/extension allow-list shared between the legacy form upload and the
+// new token-friendly endpoint below. Kept loose enough for THW field use
+// (images, scans, office docs, audio memos) and strict enough to reject
+// executables/HTML.
+const ATTACHMENT_ALLOWED_MIME_PREFIXES = [
+  'image/',
+  'text/plain',
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'application/x-zip-compressed',
+  'application/zip',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+]
+const ATTACHMENT_ALLOWED_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.tif', '.tiff', '.gif', '.webp', '.heic', '.heif',
+  '.doc', '.docx', '.xlsx', '.xls',
+  '.pdf', '.zip', '.rar', '.7z',
+  '.mp3', '.wav', '.txt'
+])
+
+/**
+ * @api {post} /api/v1/tickets/:tid/attachments Upload Attachment
+ * @apiName uploadAttachment
+ * @apiDescription Token-authenticated multipart upload. Images are
+ *   transparently downscaled to max 2400 px / JPEG q=90 to keep server
+ *   storage and bandwidth manageable; other allowed types (PDF, Office,
+ *   ZIP, audio, text) are stored as-is. 25 MB pre-resize ceiling.
+ *
+ *   Unlike the legacy /tickets/uploadattachment route, this endpoint runs
+ *   under `apiv1`/`apiv2Auth` middleware, so it does NOT require a session
+ *   cookie or CSRF token — making it usable from the PWA / native clients.
+ * @apiVersion 0.1.10
+ * @apiGroup Ticket
+ * @apiHeader {string} accesstoken (or Bearer JWT on /api/v2)
+ *
+ * @apiSuccess {boolean} success
+ * @apiSuccess {object}  ticket Updated ticket
+ * @apiSuccess {object}  attachment Newly added attachment subdoc
+ *
+ * @apiError InvalidRequest        Ticket id missing or no file in body
+ * @apiError InvalidPermissions    Caller lacks tickets:update
+ * @apiError InvalidFileType       Mime/extension not in allow-list
+ * @apiError FileTooLarge          Pre-resize size exceeds 25 MB
+ */
+apiTickets.uploadAttachment = function (req, res) {
+  const ticketId = req.params.tid
+  if (!ticketId) return res.status(400).json({ success: false, error: 'Invalid Ticket Id' })
+
+  const user = req.user
+  if (!user) return res.status(401).json({ success: false, error: 'Invalid User Auth.' })
+  if (!permissions.canThis(user.role, 'tickets:update')) {
+    return res.status(401).json({ success: false, error: 'Invalid Permissions' })
+  }
+
+  const Busboy = require('busboy')
+  const path = require('path')
+  // 25 MB pre-resize ceiling. Images get downscaled server-side, so the
+  // final on-disk size for a phone photo lands well under 2 MB. Non-image
+  // attachments hit this limit directly.
+  const MAX_BYTES = 25 * 1024 * 1024
+  let busboy
+  try {
+    busboy = Busboy({
+      headers: req.headers,
+      limits: { files: 1, fileSize: MAX_BYTES }
+    })
+  } catch (_err) {
+    // Wrong content-type (e.g. JSON instead of multipart/form-data) makes
+    // Busboy throw during construction — surface that as a clean 400.
+    return res.status(400).json({ success: false, error: 'Expected multipart/form-data' })
+  }
+
+  let error = null
+  let uploadedMime = null
+  let uploadedExt = null
+  const chunks = []
+  let truncated = false
+
+  busboy.on('file', function (_name, file, info) {
+    const filename = info.filename || ''
+    const mimetype = info.mimeType || ''
+    const ext = path.extname(filename).toLowerCase()
+
+    const mimeOk = ATTACHMENT_ALLOWED_MIME_PREFIXES.some(p => mimetype.indexOf(p) === 0)
+    const extOk = ATTACHMENT_ALLOWED_EXTS.has(ext)
+    if (!mimeOk || !extOk) {
+      error = { status: 400, message: 'Invalid File Type' }
+      return file.resume()
+    }
+
+    uploadedMime = mimetype
+    uploadedExt = ext
+
+    file.on('limit', function () {
+      truncated = true
+      error = { status: 400, message: 'File too large (max 25 MB)' }
+    })
+
+    file.on('data', function (chunk) {
+      if (error) return
+      chunks.push(chunk)
+    })
+  })
+
+  busboy.on('finish', async function () {
+    if (error || truncated) {
+      return res.status(error?.status || 400).json({ success: false, error: error?.message || 'Upload failed' })
+    }
+    if (!uploadedMime || chunks.length === 0) {
+      return res.status(400).json({ success: false, error: 'No file in request' })
+    }
+
+    let buffer = Buffer.concat(chunks)
+    // Free the chunks array eagerly — buffer is the single owner now.
+    chunks.length = 0
+
+    let finalExt = uploadedExt
+    let finalMime = uploadedMime
+
+    // Image resize: only for bitmap images, never for GIFs (would drop the
+    // animation) or for non-image types. sharp honours EXIF orientation
+    // and only downscales (`withoutEnlargement`).
+    if (uploadedMime.startsWith('image/') && uploadedMime !== 'image/gif') {
+      try {
+        const sharp = require('sharp')
+        buffer = await sharp(buffer, { failOn: 'none' })
+          .rotate()
+          .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 90, mozjpeg: true })
+          .toBuffer()
+        finalExt = '.jpg'
+        finalMime = 'image/jpeg'
+      } catch (err) {
+        // Resize failure (e.g. corrupt EXIF on a HEIC) falls back to the
+        // original buffer so the user still gets *some* upload.
+        winston.warn('Image resize failed, storing original: ' + err.message)
+      }
+    }
+
+    try {
+      const fs = require('fs-extra')
+      const Chance = require('chance')
+      const chance = new Chance()
+
+      const ticketModel = require('../../../models/ticket')
+      const ticket = await ticketModel.getTicketById(ticketId)
+      if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' })
+
+      const savePath = path.join(__dirname, '../../../../public/uploads/tickets', ticketId)
+      fs.ensureDirSync(savePath)
+
+      const storedName = chance.hash({ length: 16 }) + finalExt
+      const filePath = path.join(savePath, 'attachment_' + storedName)
+      fs.writeFileSync(filePath, buffer)
+
+      ticket.attachments.push({
+        owner: user._id,
+        name: storedName,
+        path: '/uploads/tickets/' + ticketId + '/attachment_' + storedName,
+        type: finalMime
+      })
+      ticket.history.push({
+        action: 'ticket:added:attachment',
+        description: 'Attachment ' + storedName + ' was added.',
+        owner: user._id
+      })
+      ticket.updated = Date.now()
+      const t = await ticket.save()
+      const newAttachment = t.attachments[t.attachments.length - 1]
+
+      return res.json({ success: true, ticket: t, attachment: newAttachment })
+    } catch (err) {
+      winston.warn(err)
+      return res.status(500).json({ success: false, error: err.message })
+    }
+  })
+
+  req.pipe(busboy)
+}
+
 /**
  * @api {put} /api/v1/tickets/:id/subscribe Subscribe/Unsubscribe
  * @apiName subscribeTicket
