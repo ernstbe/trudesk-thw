@@ -427,7 +427,24 @@ apiTickets.create = async function (req, res) {
 
     ticket.status = status._id
 
-    if (postData.owner !== undefined) {
+    // Owner override is a delegation feature exposed through the React
+    // CreateTicketModal when the `allowAgentUserTickets:enable` setting
+    // is on; only admins/agents may use it. Anyone else (or anyone with
+    // the setting off) gets self-assigned, preventing the IDOR where any
+    // caller could pin a ticket on an arbitrary user via the v1 body.
+    const wantsOverride = postData.owner !== undefined &&
+      postData.owner !== null &&
+      postData.owner.toString() !== req.user._id.toString()
+    if (wantsOverride) {
+      const isPrivileged = req.user.role && (req.user.role.isAdmin || req.user.role.isAgent)
+      const settingSchema = require('../../../models/setting')
+      const allowSetting = await settingSchema.getSetting('allowAgentUserTickets:enable')
+      const settingEnabled = !!(allowSetting && allowSetting.value === true)
+      if (!isPrivileged || !settingEnabled) {
+        response.success = false
+        response.error = 'Forbidden: owner override not allowed'
+        return res.status(403).json(response)
+      }
       ticket.owner = postData.owner
     } else {
       ticket.owner = req.user._id
