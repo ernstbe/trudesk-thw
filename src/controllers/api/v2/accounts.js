@@ -264,8 +264,34 @@ accountsApi.update = async function (req, res) {
     // here to prevent.
     const newRoleIsElevated = populatedUser.role.isAdmin || populatedUser.role.isAgent
     if (newRoleIsElevated) {
+      const TicketSchema = require('../../../models/ticket')
       const allGroups = await Group.getAllGroups()
       for (const g of allGroups) {
+        // Identify the personal group that createPublicAccount auto-creates
+        // for every signup ({ name: email, members: [user], sendMailTo:
+        // [user], public: true }). Once the user is elevated to support,
+        // that group is orphaned: they no longer reach it through their
+        // Team→Department chain, and it stays as an empty public group in
+        // the admin UI forever. If it still has only this one user as the
+        // sole member/sendMailTo recipient AND no ticket has ever
+        // referenced it, drop the group entirely instead of just stripping
+        // membership. Tickets keep the group alive — including soft-deleted
+        // ones, so a trash-restore still finds its parent.
+        const onlyMemberIsUser = Array.isArray(g.members) &&
+          g.members.length === 1 &&
+          String(g.members[0]._id) === postData._id
+        const onlySendMailIsUser = Array.isArray(g.sendMailTo) &&
+          g.sendMailTo.length <= 1 &&
+          (g.sendMailTo.length === 0 || String(g.sendMailTo[0]._id) === postData._id)
+        if (onlyMemberIsUser && onlySendMailIsUser && g.public === true) {
+          const ticketCount = await TicketSchema.countDocuments({ group: g._id })
+          if (ticketCount === 0) {
+            await Group.deleteOne({ _id: g._id })
+            winston.info(`accounts:update: deleted personal group "${g.name}" after role elevation of ${username}`)
+            continue
+          }
+        }
+
         let touched = false
         if (g.isMember(postData._id)) {
           await g.removeMember(postData._id)
