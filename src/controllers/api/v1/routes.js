@@ -123,8 +123,8 @@ module.exports = function (middleware, router, controllers) {
   )
   router.delete(
     '/api/v1/tickets/:tid/attachments/remove/:aid',
-    canUser('tickets:update'),
     apiv1,
+    canUser('tickets:update'),
     apiCtrl.tickets.removeAttachment
   )
 
