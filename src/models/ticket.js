@@ -133,6 +133,12 @@ ticketSchema.pre('save', async function () {
   this.subject = utils.sanitizeFieldPlainText(this.subject.trim())
   this.wasNew = this.isNew
 
+  // Stamp `updated` on every save so the PWA's "Zuletzt aktualisiert"
+  // sort and lists can rely on it. Without this the field was only ever
+  // populated via ad-hoc assignments in a few code paths, so new tickets
+  // surfaced with a 01.01.0001 timestamp in the client.
+  this.updated = new Date()
+
   if (this.uid !== undefined || this.uid) {
     return
   }
