@@ -56,6 +56,20 @@ describe('ticket.js', function () {
 
     expect(t.uid).to.be.a('number')
     testTicketUid = t.uid
+
+    // pre('save') stamps `updated` so the PWA's "Zuletzt aktualisiert"
+    // sort has a real timestamp from the start (was 01.01.0001 before).
+    expect(t.updated).to.be.a('date')
+  })
+
+  it('should bump `updated` when an existing ticket is saved', async function () {
+    const ticket = await ticketSchema.getTicketByUid(testTicketUid)
+    const before = ticket.updated
+    // wait a tick to make sure the timestamp actually moves
+    await new Promise(resolve => setTimeout(resolve, 10))
+    ticket.subject = ticket.subject + ' (touched)'
+    const saved = await ticket.save()
+    expect(saved.updated.getTime()).to.be.greaterThan(before.getTime())
   })
 
   it('should set the ticket status to closed then to open', async function () {
