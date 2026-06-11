@@ -111,6 +111,12 @@ taskRunner.createTicketFromRecurringTask = async function (task) {
     ticketData.assignee = task.ticketAssignee
   }
 
+  if (task.checklist && task.checklist.length > 0) {
+    ticketData.checklist = task.checklist.map(function (item) {
+      return { title: item.title, completed: false }
+    })
+  }
+
   const ticket = new TicketSchema(ticketData)
   const saved = await ticket.save()
   await saved.populate('group owner priority')

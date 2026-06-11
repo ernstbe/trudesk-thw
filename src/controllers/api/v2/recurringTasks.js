@@ -1,5 +1,6 @@
 const RecurringTask = require('../../../models/recurringTask')
 const apiUtil = require('../apiUtils')
+const parseChecklist = require('./checklistParser')
 
 const recurringTasksApi = {}
 
@@ -29,6 +30,12 @@ recurringTasksApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)
 
+  let checklist
+  if (postData.checklist !== undefined) {
+    checklist = parseChecklist(postData.checklist)
+    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
+  }
+
   try {
     let task = await RecurringTask.create({
       name: postData.name,
@@ -40,6 +47,7 @@ recurringTasksApi.create = async function (req, res) {
       ticketPriority: postData.ticketPriority,
       ticketAssignee: postData.ticketAssignee,
       ticketTags: postData.ticketTags,
+      checklist,
       scheduleType: postData.scheduleType,
       dayOfMonth: postData.dayOfMonth,
       monthsOfYear: postData.monthsOfYear,
@@ -60,6 +68,12 @@ recurringTasksApi.update = async function (req, res) {
   const postData = req.body
   if (!id || !postData) return apiUtil.sendApiError(res, 400, 'Invalid Parameters')
 
+  let checklist
+  if (postData.checklist !== undefined) {
+    checklist = parseChecklist(postData.checklist)
+    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
+  }
+
   try {
     let task = await RecurringTask.findById(id)
     if (!task) return apiUtil.sendApiError(res, 404, 'Recurring task not found')
@@ -75,6 +89,10 @@ recurringTasksApi.update = async function (req, res) {
       if (postData[field] !== undefined) {
         task[field] = postData[field]
       }
+    }
+
+    if (checklist !== undefined) {
+      task.checklist = checklist
     }
 
     // Recalculate next run when schedule changes

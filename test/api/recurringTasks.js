@@ -6,6 +6,7 @@ const m = require('mongoose')
 describe('api/recurringTasks.js', function () {
   const agent = superagent.agent()
   let createdTaskId
+  let checklistTaskId
   const baseUrl = 'http://localhost:3111'
 
   before(function (done) {
@@ -47,6 +48,53 @@ describe('api/recurringTasks.js', function () {
         expect(res.body.recurringTask.name).to.equal('API Monatliche Wartung')
         expect(res.body.recurringTask.enabled).to.be.true
         createdTaskId = res.body.recurringTask._id
+        done()
+      })
+  })
+
+  it('should create a recurring task with a checklist', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/recurring-tasks')
+      .type('json')
+      .send({
+        name: 'API Wartung mit Checkliste',
+        ticketSubject: 'Wartung mit Checkliste',
+        ticketIssue: 'Bitte Checkliste abarbeiten',
+        ticketType: new m.Types.ObjectId().toString(),
+        ticketGroup: new m.Types.ObjectId().toString(),
+        ticketPriority: new m.Types.ObjectId().toString(),
+        scheduleType: 'monthly',
+        checklist: [{ title: '  Filter pruefen  ' }, { title: 'Oelstand kontrollieren' }]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.recurringTask.checklist).to.be.a('array')
+        expect(res.body.recurringTask.checklist).to.have.length(2)
+        expect(res.body.recurringTask.checklist[0].title).to.equal('Filter pruefen')
+        expect(res.body.recurringTask.checklist[1].title).to.equal('Oelstand kontrollieren')
+        checklistTaskId = res.body.recurringTask._id
+        done()
+      })
+  })
+
+  it('should reject a non-array checklist on create', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/recurring-tasks')
+      .type('json')
+      .send({
+        name: 'API Ungueltige Checkliste',
+        ticketSubject: 'Wartung',
+        ticketIssue: 'Wartung',
+        ticketType: new m.Types.ObjectId().toString(),
+        ticketGroup: new m.Types.ObjectId().toString(),
+        ticketPriority: new m.Types.ObjectId().toString(),
+        scheduleType: 'monthly',
+        checklist: 'garbage'
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(400)
+        expect(res.body.success).to.be.false
         done()
       })
   })
@@ -115,6 +163,72 @@ describe('api/recurringTasks.js', function () {
         expect(res.status).to.equal(200)
         expect(res.body.success).to.be.true
         expect(res.body.recurringTask.enabled).to.be.false
+        done()
+      })
+  })
+
+  it('should replace the checklist on update', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/recurring-tasks/' + checklistTaskId)
+      .type('json')
+      .send({
+        checklist: [{ title: 'Ersatzschritt' }]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.recurringTask.checklist).to.have.length(1)
+        expect(res.body.recurringTask.checklist[0].title).to.equal('Ersatzschritt')
+        done()
+      })
+  })
+
+  it('should keep the checklist unchanged when omitted on update', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/recurring-tasks/' + checklistTaskId)
+      .type('json')
+      .send({ description: 'Nur Beschreibung geaendert' })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.recurringTask.checklist).to.have.length(1)
+        expect(res.body.recurringTask.checklist[0].title).to.equal('Ersatzschritt')
+        done()
+      })
+  })
+
+  it('should reject a non-array checklist on update', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/recurring-tasks/' + checklistTaskId)
+      .type('json')
+      .send({ checklist: 'garbage' })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(400)
+        expect(res.body.success).to.be.false
+        done()
+      })
+  })
+
+  it('should clear the checklist when updating with an empty array', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/recurring-tasks/' + checklistTaskId)
+      .type('json')
+      .send({ checklist: [] })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.recurringTask.checklist).to.have.length(0)
+        done()
+      })
+  })
+
+  it('should delete the checklist recurring task', function (done) {
+    agent
+      .delete(baseUrl + '/api/v2/recurring-tasks/' + checklistTaskId)
+      .end(function (err, res) {
+        if (err) return done(err)
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
         done()
       })
   })
