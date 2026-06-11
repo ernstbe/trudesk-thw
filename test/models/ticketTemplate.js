@@ -24,6 +24,39 @@ describe('models/ticketTemplate.js', function () {
     templateId = template._id
   })
 
+  it('should create a ticket template with checklist items', async function () {
+    const template = await TicketTemplate.create({
+      name: 'Checklist Template',
+      subject: 'Checklist Subject',
+      checklist: [{ title: 'First Step' }, { title: 'Second Step' }],
+      createdBy: new m.Types.ObjectId()
+    })
+
+    expect(template.checklist).to.have.length(2)
+    expect(template.checklist[0].title).to.equal('First Step')
+    expect(template.checklist[1].title).to.equal('Second Step')
+  })
+
+  it('should default checklist to an empty array', async function () {
+    const template = await TicketTemplate.findById(templateId)
+    expect(template.checklist).to.be.a('array')
+    expect(template.checklist).to.have.length(0)
+  })
+
+  it('should require a title on checklist items', async function () {
+    try {
+      await TicketTemplate.create({
+        name: 'Invalid Checklist Template',
+        subject: 'Checklist Subject',
+        checklist: [{}],
+        createdBy: new m.Types.ObjectId()
+      })
+      expect.fail('Should have thrown validation error')
+    } catch (err) {
+      expect(err.name).to.equal('ValidationError')
+    }
+  })
+
   it('should get all templates', async function () {
     const templates = await TicketTemplate.getAll()
     expect(templates).to.be.a('array')

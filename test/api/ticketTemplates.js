@@ -6,6 +6,7 @@ const m = require('mongoose')
 describe('api/ticketTemplates.js', function () {
   const agent = superagent.agent()
   let createdTemplateId
+  let checklistTemplateId
   const baseUrl = 'http://localhost:3111'
 
   before(function (done) {
@@ -45,6 +46,61 @@ describe('api/ticketTemplates.js', function () {
       })
   })
 
+  it('should create a ticket template with a checklist', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/ticket-templates')
+      .type('json')
+      .send({
+        name: 'API Checklist Template',
+        subject: 'Checklist Subject',
+        checklist: [{ title: '  Check Power Supply  ' }, { title: 'Verify Network' }]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticketTemplate.checklist).to.be.a('array')
+        expect(res.body.ticketTemplate.checklist).to.have.length(2)
+        expect(res.body.ticketTemplate.checklist[0].title).to.equal('Check Power Supply')
+        expect(res.body.ticketTemplate.checklist[1].title).to.equal('Verify Network')
+        checklistTemplateId = res.body.ticketTemplate._id
+        done()
+      })
+  })
+
+  it('should drop checklist items without a valid title', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/ticket-templates')
+      .type('json')
+      .send({
+        name: 'API Checklist Dropped Items Template',
+        subject: 'Checklist Subject',
+        checklist: [{ title: 'Valid Item' }, { title: '   ' }, { title: 42 }, 'garbage', null]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticketTemplate.checklist).to.have.length(1)
+        expect(res.body.ticketTemplate.checklist[0].title).to.equal('Valid Item')
+        done()
+      })
+  })
+
+  it('should reject a non-array checklist on create', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/ticket-templates')
+      .type('json')
+      .send({
+        name: 'API Invalid Checklist Template',
+        subject: 'Checklist Subject',
+        checklist: 'garbage'
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(400)
+        expect(res.body.success).to.be.false
+        done()
+      })
+  })
+
   it('should get all ticket templates', function (done) {
     agent
       .get(baseUrl + '/api/v2/ticket-templates')
@@ -64,6 +120,18 @@ describe('api/ticketTemplates.js', function () {
         expect(res.status).to.equal(200)
         expect(res.body.success).to.be.true
         expect(res.body.ticketTemplate.name).to.equal('API Test Template')
+        done()
+      })
+  })
+
+  it('should return the checklist when getting a single template', function (done) {
+    agent
+      .get(baseUrl + '/api/v2/ticket-templates/' + checklistTemplateId)
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticketTemplate.checklist).to.have.length(2)
+        expect(res.body.ticketTemplate.checklist[0].title).to.equal('Check Power Supply')
         done()
       })
   })
@@ -91,6 +159,51 @@ describe('api/ticketTemplates.js', function () {
         expect(res.body.success).to.be.true
         expect(res.body.ticketTemplate.name).to.equal('Updated Template')
         expect(res.body.ticketTemplate.subject).to.equal('Updated Subject')
+        done()
+      })
+  })
+
+  it('should replace the checklist on update', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/ticket-templates/' + checklistTemplateId)
+      .type('json')
+      .send({
+        checklist: [{ title: 'Replaced Step' }]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticketTemplate.checklist).to.have.length(1)
+        expect(res.body.ticketTemplate.checklist[0].title).to.equal('Replaced Step')
+        done()
+      })
+  })
+
+  it('should clear the checklist when updating with an empty array', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/ticket-templates/' + checklistTemplateId)
+      .type('json')
+      .send({
+        checklist: []
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticketTemplate.checklist).to.have.length(0)
+        done()
+      })
+  })
+
+  it('should reject a non-array checklist on update', function (done) {
+    agent
+      .put(baseUrl + '/api/v2/ticket-templates/' + checklistTemplateId)
+      .type('json')
+      .send({
+        checklist: 'garbage'
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(400)
+        expect(res.body.success).to.be.false
         done()
       })
   })
