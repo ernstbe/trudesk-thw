@@ -223,6 +223,60 @@ describe('api/tickets.js', function () {
       .expect(400, done)
   })
 
+  it('should set additional assignees via API', async function () {
+    const userSchema = require('../../src/models/user')
+    const admin = await userSchema.getUserByUsername('trudesk')
+    const support = await userSchema.getUserByUsername('fake.user')
+    expect(admin).to.be.a('object')
+    expect(support).to.be.a('object')
+
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId + '/additional-assignees')
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ additionalAssignees: [admin._id.toString(), support._id.toString()] })
+
+    expect(res.status).to.equal(200)
+    expect(res.body.success).to.be.true
+    expect(res.body.ticket).to.be.a('object')
+    expect(res.body.ticket.additionalAssignees).to.be.a('array')
+    expect(res.body.ticket.additionalAssignees).to.have.length(2)
+
+    const usernames = res.body.ticket.additionalAssignees.map(function (u) {
+      return u.username
+    })
+    expect(usernames).to.include('trudesk')
+    expect(usernames).to.include('fake.user')
+
+    const historyActions = res.body.ticket.history.map(function (h) {
+      return h.action
+    })
+    expect(historyActions).to.include('ticket:set:additionalAssignees')
+  })
+
+  it('should clear additional assignees via API with an empty array', async function () {
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId + '/additional-assignees')
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ additionalAssignees: [] })
+
+    expect(res.status).to.equal(200)
+    expect(res.body.success).to.be.true
+    expect(res.body.ticket.additionalAssignees).to.have.length(0)
+  })
+
+  it('should reject invalid additional assignee ids via API', async function () {
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId + '/additional-assignees')
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ additionalAssignees: ['not-an-objectid'] })
+
+    expect(res.status).to.equal(400)
+    expect(res.body.success).to.be.false
+  })
+
   it('should delete a ticket via API', function (done) {
     api
       .delete('/api/v1/tickets/' + createdTicketId)

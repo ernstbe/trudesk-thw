@@ -883,6 +883,78 @@ apiTickets.clearAssignee = async function (req, res) {
 }
 
 /**
+ * @api {put} /api/v1/tickets/:id/additional-assignees Set Ticket Additional Assignees
+ * @apiName setTicketAdditionalAssignees
+ * @apiDescription Replaces the list of additional assignees for a ticket. An empty array clears the list.
+ * @apiVersion 0.1.0
+ * @apiGroup Ticket
+ * @apiHeader {string} accesstoken The access token for the logged in user
+ *
+ * @apiParamExample {json} Request:
+ * {
+ *      "additionalAssignees": ["5eb6f3257b21c30fbbfd2cd6"]
+ * }
+ */
+apiTickets.setAdditionalAssignees = async function (req, res) {
+  const user = req.user
+  if (user === undefined || user === null) return res.status(401).json({ success: false, error: 'Invalid Access Token' })
+
+  const oId = req.params.id
+  const additionalAssignees = req.body.additionalAssignees
+
+  if (oId === undefined) return res.status(400).json({ success: false, error: 'Invalid Ticket ObjectID.' })
+  if (!Array.isArray(additionalAssignees)) { return res.status(400).json({ success: false, error: 'Invalid Additional Assignees' }) }
+
+  const mongoose = require('mongoose')
+  const allValid = additionalAssignees.every(function (id) {
+    return mongoose.Types.ObjectId.isValid(id)
+  })
+
+  if (!allValid) return res.status(400).json({ success: false, error: 'Invalid Additional Assignees' })
+
+  try {
+    const ticketModel = require('../../../models/ticket')
+    const ticket = await ticketModel.getTicketById(oId)
+    if (!ticket) return res.status(400).json({ success: false, error: 'Unable to locate ticket. Aborting...' })
+
+    // De-duplicate and silently drop the primary assignee - primary stays primary
+    const primaryId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
+    const userIds = [...new Set(additionalAssignees.map(String))].filter(function (id) {
+      return id !== primaryId
+    })
+
+    const before = ticket.additionalAssignees.map(function (u) {
+      return (u._id || u).toString()
+    })
+    const newlyAdded = userIds.filter(function (id) {
+      return !before.includes(id)
+    })
+
+    await ticket.setAdditionalAssignees(user._id, userIds)
+
+    // Subscriber/notification parity with the single-assignee path
+    for (const id of newlyAdded) {
+      ticket.addSubscriber(id)
+    }
+
+    const t = await ticket.save()
+    await t.populate('additionalAssignees', 'username fullname email role image title')
+
+    for (const id of newlyAdded) {
+      emitter.emit('ticket:subscriber:update', { user: id, subscribe: true })
+    }
+
+    if (!permissions.canThis(user.role, 'tickets:notes')) {
+      t.notes = []
+    }
+
+    return res.json({ success: true, error: null, ticket: t })
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
+}
+
+/**
  * @api {delete} /api/v1/tickets/:id Delete Ticket
  * @apiName deleteTicket
  * @apiDescription Deletes ticket via given OID

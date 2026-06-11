@@ -49,7 +49,8 @@ export default [
       'src/public/js/plugins/',
       'src/public/js/vendor/',
       'src/client/components/OffCanvasEditor/',
-      'node_modules/'
+      'node_modules/',
+      '.claude/'
     ]
   }
 ]

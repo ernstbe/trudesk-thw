@@ -156,6 +156,44 @@ describe('ticket.js', function () {
     expect(updatedTicket.assignee).to.not.exist
   })
 
+  it('should set additional assignees with history entry', async function () {
+    const userSchema = require('../../src/models/user')
+    const user = await userSchema.getUserByUsername('trudesk')
+    expect(user).to.be.a('object')
+
+    const ticket = await ticketSchema.getTicketByUid(testTicketUid)
+    expect(ticket).to.be.a('object')
+
+    const updatedTicket = await ticket.setAdditionalAssignees(user._id, [user._id])
+    expect(updatedTicket.additionalAssignees).to.have.length(1)
+    expect(updatedTicket.additionalAssignees[0].toString()).to.equal(user._id.toString())
+
+    const historyItem = updatedTicket.history[updatedTicket.history.length - 1]
+    expect(historyItem.action).to.equal('ticket:set:additionalAssignees')
+    expect(historyItem.description).to.contain(user.fullname)
+
+    // Fake populate required Fields (random refs populate to null otherwise)
+    updatedTicket.group = new m.Types.ObjectId()
+    updatedTicket.owner = new m.Types.ObjectId()
+    updatedTicket.type = new m.Types.ObjectId()
+
+    await updatedTicket.save()
+  })
+
+  it('should get assigned tickets for an additional assignee', async function () {
+    const userSchema = require('../../src/models/user')
+    const user = await userSchema.getUserByUsername('trudesk')
+    expect(user).to.be.a('object')
+
+    // The setAssignee test above never saves, so the ticket can only match
+    // through the persisted additionalAssignees array.
+    const tickets = await ticketSchema.getAssigned(user._id)
+    const found = tickets.some(function (t) {
+      return t.uid === testTicketUid
+    })
+    expect(found).to.be.true
+  })
+
   it('should add Comment and Save', async function () {
     const ticket = await ticketSchema.getTicketByUid(testTicketUid)
     expect(ticket).to.be.a('object')
