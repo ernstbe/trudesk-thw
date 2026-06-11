@@ -114,6 +114,16 @@ module.exports = function (middleware, router, controllers) {
   router.delete('/api/v1/tickets/:id', apiv1, canUser('tickets:delete'), apiCtrl.tickets.delete)
   router.put('/api/v1/tickets/:id/assignee', apiv1, canUser('ticket:setAssignee'), apiCtrl.tickets.setAssignee)
   router.delete('/api/v1/tickets/:id/assignee', apiv1, canUser('ticket:setAssignee'), apiCtrl.tickets.clearAssignee)
+  // Note: the legacy 'ticket:setAssignee' grant is not part of any seeded role
+  // ('tickets:*' does not match the singular 'ticket:' prefix), so this uses
+  // 'tickets:update' - the same permission that already gates assignee changes
+  // through PUT /api/v1/tickets/:id.
+  router.put(
+    '/api/v1/tickets/:id/additional-assignees',
+    apiv1,
+    canUser('tickets:update'),
+    apiCtrl.tickets.setAdditionalAssignees
+  )
   router.put('/api/v1/tickets/:id/subscribe', apiv1, apiCtrl.tickets.subscribe)
   router.post(
     '/api/v1/tickets/:tid/attachments',

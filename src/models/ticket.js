@@ -82,6 +82,7 @@ const ticketSchema = mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'accounts'
   },
+  additionalAssignees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'accounts' }],
   date: { type: Date, default: Date.now, required: true, index: true },
   updated: { type: Date },
   deleted: { type: Boolean, default: false, required: true, index: true },
@@ -159,7 +160,7 @@ ticketSchema.post('save', async function (doc) {
     try {
       const savedTicket = await doc.populate([
         {
-          path: 'owner assignee comments.owner notes.owner subscribers history.owner',
+          path: 'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
           select: '_id username fullname email role image title'
         },
         { path: 'type tags' },
@@ -293,6 +294,42 @@ ticketSchema.methods.clearAssignee = function (ownerId) {
   const historyItem = {
     action: 'ticket:set:assignee',
     description: 'Assignee was cleared',
+    owner: ownerId
+  }
+
+  this.history.push(historyItem)
+
+  return this
+}
+
+/**
+ * Replaces the additional assignees on the instanced Ticket.
+ * The primary assignee is unaffected.
+ * @instance
+ * @method setAdditionalAssignees
+ * @memberof Ticket
+ *
+ * @param {Object} ownerId Account ID preforming this action
+ * @param {Array} userIds User IDs to set as additional assignees (empty array clears)
+ */
+ticketSchema.methods.setAdditionalAssignees = async function (ownerId, userIds) {
+  if (!Array.isArray(userIds)) throw new Error('Invalid User Ids')
+
+  this.additionalAssignees = userIds
+
+  let description = 'Additional assignees were cleared'
+  if (userIds.length > 0) {
+    const users = await userSchema.find({ _id: { $in: userIds } }, 'fullname')
+    const names = users.map(function (u) {
+      return u.fullname
+    })
+
+    description = 'Additional assignees set: ' + names.join(', ')
+  }
+
+  const historyItem = {
+    action: 'ticket:set:additionalAssignees',
+    description,
     owner: ownerId
   }
 
@@ -614,7 +651,7 @@ ticketSchema.methods.removeSubscriber = function (userId) {
 ticketSchema.statics.getAll = async function () {
   return this.model(COLLECTION)
     .find({ deleted: false })
-    .populate('owner assignee', '-password -__v -preferences -iOSDeviceTokens -tOTPKey')
+    .populate('owner assignee additionalAssignees', '-password -__v -preferences -iOSDeviceTokens -tOTPKey')
     .populate('type tags status group')
     .sort({ status: 1 })
     .lean()
@@ -653,7 +690,7 @@ ticketSchema.statics.getAllByStatus = async function (status) {
   return this.model(COLLECTION)
     .find({ status: { $in: status }, deleted: false })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status group')
@@ -682,7 +719,7 @@ ticketSchema.statics.getTickets = async function (grpIds) {
   return this.model(COLLECTION)
     .find({ group: { $in: grpIds }, deleted: false })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status group')
@@ -749,7 +786,7 @@ function buildQueryWithObject (SELF, grpId, object, count) {
     query = SELF.model(COLLECTION)
       .find({ group: { $in: grpId }, deleted: false })
       .populate(
-        'owner assignee subscribers comments.owner notes.owner history.owner',
+        'owner assignee additionalAssignees subscribers comments.owner notes.owner history.owner',
         'username fullname email role image title'
       )
       .populate('assignee', 'username fullname email role image title')
@@ -852,7 +889,7 @@ ticketSchema.statics.getTicketsByStatus = async function (grpId, status) {
   return this.model(COLLECTION)
     .find({ group: { $in: grpId }, status, deleted: false })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status group')
@@ -874,7 +911,7 @@ ticketSchema.statics.getTicketByUid = async function (uid) {
   return this.model(COLLECTION)
     .findOne({ uid, deleted: false })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status group')
@@ -897,7 +934,7 @@ ticketSchema.statics.getTicketById = async function (id) {
   return this.model(COLLECTION)
     .findOne({ _id: id, deleted: false })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status')
@@ -935,7 +972,7 @@ ticketSchema.statics.getTicketsByRequester = async function (userId) {
     .find({ owner: userId, deleted: false })
     .limit(10000)
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status')
@@ -969,7 +1006,7 @@ ticketSchema.statics.getTicketsWithSearchString = async function (grps, search) 
         $where: '/^' + search + '.*/.test(this.uid)'
       })
       .populate(
-        'owner assignee comments.owner notes.owner subscribers history.owner',
+        'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
         'username fullname email role image title'
       )
       .populate('type tags status group')
@@ -982,7 +1019,7 @@ ticketSchema.statics.getTicketsWithSearchString = async function (grps, search) 
         subject: { $regex: search, $options: 'i' }
       })
       .populate(
-        'owner assignee comments.owner notes.owner subscribers history.owner',
+        'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
         'username fullname email role image title'
       )
       .populate('type tags status group')
@@ -995,7 +1032,7 @@ ticketSchema.statics.getTicketsWithSearchString = async function (grps, search) 
         issue: { $regex: search, $options: 'i' }
       })
       .populate(
-        'owner assignee comments.owner notes.owner subscribers history.owner',
+        'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
         'username fullname email role image title'
       )
       .populate('type tags status group')
@@ -1170,9 +1207,13 @@ ticketSchema.statics.getAssigned = async function (userId) {
   const unresolvedStatusesIds = statuses.map(i => i._id)
 
   return this.model(COLLECTION)
-    .find({ assignee: userId, deleted: false, status: { $in: unresolvedStatusesIds } })
+    .find({
+      $or: [{ assignee: userId }, { additionalAssignees: userId }],
+      deleted: false,
+      status: { $in: unresolvedStatusesIds }
+    })
     .populate(
-      'owner assignee comments.owner notes.owner subscribers history.owner',
+      'owner assignee additionalAssignees comments.owner notes.owner subscribers history.owner',
       'username fullname email role image title'
     )
     .populate('type tags status group')
