@@ -117,6 +117,52 @@ describe('api/tickets.js', function () {
       .to.equal(otherType._id.toString())
   })
 
+  it('should update a ticket due date via API', async function () {
+    // Regression test: the PUT /tickets/:id handler used to drop the
+    // `dueDate` field on the floor, so due dates set in the PWA after
+    // ticket creation never persisted and the overdue dashboard count
+    // stayed at zero.
+    const dueDate = new Date('2030-01-15T00:00:00.000Z')
+
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId)
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ dueDate: dueDate.toISOString() })
+
+    expect(res.status).to.equal(200)
+    expect(res.body.success).to.be.true
+    expect(res.body.ticket).to.be.a('object')
+    expect(new Date(res.body.ticket.dueDate).getTime()).to.equal(dueDate.getTime())
+
+    // A history entry documents the change
+    const historyActions = res.body.ticket.history.map(function (h) { return h.action })
+    expect(historyActions).to.include('ticket:set:duedate')
+  })
+
+  it('should clear a ticket due date via API', async function () {
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId)
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ dueDate: null })
+
+    expect(res.status).to.equal(200)
+    expect(res.body.success).to.be.true
+    expect(res.body.ticket.dueDate).to.not.exist
+  })
+
+  it('should reject an invalid due date via API', async function () {
+    const res = await api
+      .put('/api/v1/tickets/' + createdTicketId)
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ dueDate: 'not-a-date' })
+
+    expect(res.status).to.equal(400)
+    expect(res.body.success).to.be.false
+  })
+
   it('should add a comment to a ticket', function (done) {
     api
       .post('/api/v1/tickets/addcomment')

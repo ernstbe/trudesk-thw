@@ -749,6 +749,23 @@ apiTickets.update = async function (req, res) {
         await ticket.populate('type')
       }
 
+      // Same silent-drop class as the type field above: due-date edits
+      // from the PWA returned success while persisting nothing. `null`
+      // clears the date; skip identical values so plain subject/issue
+      // updates don't spam the history with duedate entries.
+      if (reqTicket.dueDate !== undefined) {
+        const newDueDate = reqTicket.dueDate === null ? null : new Date(reqTicket.dueDate)
+        if (newDueDate !== null && isNaN(newDueDate.getTime())) {
+          return res.status(400).json({ success: false, error: 'Invalid dueDate' })
+        }
+
+        const currentTime = ticket.dueDate ? new Date(ticket.dueDate).getTime() : null
+        const newTime = newDueDate === null ? null : newDueDate.getTime()
+        if (currentTime !== newTime) {
+          ticket.setTicketDueDate(req.user._id, newDueDate)
+        }
+      }
+
       if (reqTicket.closedDate !== undefined) {
         ticket.closedDate = reqTicket.closedDate
       }
