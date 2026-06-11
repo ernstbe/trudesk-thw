@@ -10,6 +10,11 @@ const ticketTemplateSchema = mongoose.Schema({
   group: { type: mongoose.Schema.Types.ObjectId, ref: 'groups' },
   priority: { type: mongoose.Schema.Types.ObjectId, ref: 'priorities' },
   tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'tags' }],
+  checklist: [
+    {
+      title: { type: String, required: true }
+    }
+  ],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'accounts', required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date }

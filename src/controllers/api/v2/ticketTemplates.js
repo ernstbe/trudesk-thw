@@ -1,7 +1,27 @@
+const sanitizeHtml = require('sanitize-html')
 const TicketTemplate = require('../../../models/ticketTemplate')
 const apiUtil = require('../apiUtils')
 
 const ticketTemplatesApi = {}
+
+// Returns a sanitized checklist array or null if the input is not an array.
+// Items without a non-empty string title are dropped.
+function parseChecklist (input) {
+  if (!Array.isArray(input)) return null
+
+  const checklist = []
+  for (let i = 0; i < input.length; i++) {
+    const item = input[i]
+    if (!item || typeof item !== 'object' || typeof item.title !== 'string') continue
+
+    const title = sanitizeHtml(item.title).trim()
+    if (title.length < 1) continue
+
+    checklist.push({ title })
+  }
+
+  return checklist
+}
 
 ticketTemplatesApi.get = async function (req, res) {
   try {
@@ -29,6 +49,12 @@ ticketTemplatesApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)
 
+  let checklist
+  if (postData.checklist !== undefined) {
+    checklist = parseChecklist(postData.checklist)
+    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
+  }
+
   try {
     let template = await TicketTemplate.create({
       name: postData.name,
@@ -38,6 +64,7 @@ ticketTemplatesApi.create = async function (req, res) {
       group: postData.group,
       priority: postData.priority,
       tags: postData.tags,
+      checklist,
       createdBy: req.user._id
     })
 
@@ -53,6 +80,12 @@ ticketTemplatesApi.update = async function (req, res) {
   const postData = req.body
   if (!id || !postData) return apiUtil.sendApiError(res, 400, 'Invalid Parameters')
 
+  let checklist
+  if (postData.checklist !== undefined) {
+    checklist = parseChecklist(postData.checklist)
+    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
+  }
+
   try {
     let template = await TicketTemplate.findById(id)
     if (!template) return apiUtil.sendApiError(res, 404, 'Ticket template not found')
@@ -64,6 +97,10 @@ ticketTemplatesApi.update = async function (req, res) {
       if (postData[field] !== undefined) {
         template[field] = postData[field]
       }
+    }
+
+    if (checklist !== undefined) {
+      template.checklist = checklist
     }
 
     await template.save()
