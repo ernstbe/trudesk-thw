@@ -297,6 +297,61 @@ async function stripAgentsFromGroups () {
   }
 }
 
+// Until PR #106 the checklistParser stored titles entity-encoded (the
+// sanitize-html default: & as &amp;, < as &lt;, ...). Existing documents in
+// tickettemplates / recurringtasks / tickets may still carry escaped titles.
+// Entity-decoding is NOT idempotent — a title that legitimately contains
+// "&amp;" would lose another layer on every pass — so unlike the always-run
+// steps above this one is gated behind a settings flag and runs exactly once.
+// The flag is only written after a successful pass, so a failed run retries
+// on the next boot.
+const DECODE_CHECKLIST_TITLES_FLAG = 'migration:decodeChecklistTitles:done'
+
+async function decodeChecklistTitles () {
+  const flag = await SettingsSchema.getSettingByName(DECODE_CHECKLIST_TITLES_FLAG)
+  if (flag && flag.value === true) return
+
+  const { decodeEntities } = require('../controllers/api/v2/checklistParser')
+  const collections = [
+    require('../models/ticketTemplate').collection,
+    require('../models/recurringTask').collection,
+    require('../models/ticket').collection
+  ]
+
+  let updated = 0
+  for (const collection of collections) {
+    const cursor = collection.find(
+      { 'checklist.title': /&(?:amp|lt|gt|quot|#39);/ },
+      { projection: { checklist: 1 } }
+    )
+    for await (const doc of cursor) {
+      if (!Array.isArray(doc.checklist)) continue
+
+      let changed = false
+      const checklist = doc.checklist.map(item => {
+        if (!item || typeof item.title !== 'string') return item
+        const decoded = decodeEntities(item.title)
+        if (decoded === item.title) return item
+        changed = true
+        return { ...item, title: decoded }
+      })
+      if (!changed) continue
+
+      await collection.updateOne({ _id: doc._id }, { $set: { checklist } })
+      updated++
+      winston.info(`decodeChecklistTitles: decoded checklist titles on ${collection.collectionName}/${doc._id}`)
+    }
+  }
+
+  if (updated > 0) winston.info(`decodeChecklistTitles: decoded checklist titles on ${updated} document(s)`)
+
+  await SettingsSchema.collection.updateOne(
+    { name: DECODE_CHECKLIST_TITLES_FLAG },
+    { $set: { value: true } },
+    { upsert: true }
+  )
+}
+
 function createTicketStatus (callback) {
   const Status = require('../models/ticketStatus')
   const counterSchema = require('../models/counters')
@@ -464,6 +519,14 @@ migrations.run = function (callback) {
             winston.warn('stripAgentsFromGroups failed: ' + err.message)
             return next()
           })
+      },
+      function (next) {
+        decodeChecklistTitles()
+          .then(() => next())
+          .catch(err => {
+            winston.warn('decodeChecklistTitles failed: ' + err.message)
+            return next()
+          })
       }
     ],
     function (err) {
@@ -473,5 +536,8 @@ migrations.run = function (callback) {
     }
   )
 }
+
+// Exported for tests.
+migrations.decodeChecklistTitles = decodeChecklistTitles
 
 module.exports = migrations

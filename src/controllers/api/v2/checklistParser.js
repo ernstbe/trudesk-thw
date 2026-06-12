@@ -48,4 +48,4 @@ function parseChecklistField (value) {
   return parseChecklist(value)
 }
 
-module.exports = { parseChecklist, parseChecklistField }
+module.exports = { parseChecklist, parseChecklistField, decodeEntities }
