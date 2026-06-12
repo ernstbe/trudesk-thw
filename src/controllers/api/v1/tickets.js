@@ -724,9 +724,10 @@ apiTickets.update = async function (req, res) {
       // Field whitelist + history semantics live in the shared helper so the
       // v2 update endpoint persists exactly the same fields as this one.
       // It throws Error('Invalid dueDate') for unparsable dates, which the
-      // catch below maps to the same 400 response as before.
+      // catch below maps to the same 400 response as before, and a
+      // statusCode=403 error for group moves the caller may not perform.
       const { applyTicketUpdate } = require('../ticketUpdateHelper')
-      await applyTicketUpdate(ticket, reqTicket, req.user._id)
+      await applyTicketUpdate(ticket, reqTicket, req.user)
 
       const savedTicket = await ticket.save()
 
@@ -740,7 +741,8 @@ apiTickets.update = async function (req, res) {
         ticket: savedTicket
       })
     } catch (err) {
-      return res.status(400).json({ success: false, error: err.message })
+      const status = err.statusCode === 403 ? 403 : 400
+      return res.status(status).json({ success: false, error: err.message })
     }
   } else {
     return res.status(403).json({ success: false, error: 'Invalid Access Token' })
