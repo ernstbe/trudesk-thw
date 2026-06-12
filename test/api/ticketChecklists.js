@@ -7,6 +7,9 @@ describe('api/ticketChecklists.js', function () {
   const baseUrl = 'http://localhost:3111'
   let testTicketUid
   let checklistItemId
+  let testTypeId
+  let testGroupId
+  let testPriorityId
 
   before(function (done) {
     agent
@@ -33,6 +36,9 @@ describe('api/ticketChecklists.js', function () {
           userSchema.getUserByUsername('trudesk'),
           statusSchema.findOne({ uid: 0 })
         ]).then(function (results) {
+          testTypeId = results[0]._id.toString()
+          testGroupId = results[1]._id.toString()
+          testPriorityId = results[2]._id.toString()
           Ticket.create({
             owner: results[3]._id,
             group: results[1]._id,
@@ -144,6 +150,54 @@ describe('api/ticketChecklists.js', function () {
       .post(baseUrl + '/api/v2/tickets/' + testTicketUid + '/checklist')
       .type('json')
       .send({})
+      .end(function (_err, res) {
+        expect(res.status).to.equal(400)
+        expect(res.body.success).to.be.false
+        done()
+      })
+  })
+
+  it('should create a ticket with a sanitized checklist and ignore completed flags', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/tickets')
+      .type('json')
+      .send({
+        subject: 'Ticket with seeded checklist',
+        issue: 'Checklist injected on create',
+        type: testTypeId,
+        group: testGroupId,
+        priority: testPriorityId,
+        checklist: [
+          { title: '<b>Filter pruefen</b>', completed: true, completedBy: '000000000000000000000000' },
+          { title: 'Oel & Filter' }
+        ]
+      })
+      .end(function (_err, res) {
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        expect(res.body.ticket.checklist).to.be.a('array')
+        expect(res.body.ticket.checklist).to.have.length(2)
+        expect(res.body.ticket.checklist[0].title).to.equal('Filter pruefen')
+        expect(res.body.ticket.checklist[0].completed).to.be.false
+        expect(res.body.ticket.checklist[0].completedBy).to.not.exist
+        expect(res.body.ticket.checklist[1].title).to.equal('Oel & Filter')
+        expect(res.body.ticket.checklist[1].completed).to.be.false
+        done()
+      })
+  })
+
+  it('should reject ticket creation with a non-array checklist', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/tickets')
+      .type('json')
+      .send({
+        subject: 'Ticket with bad checklist',
+        issue: 'Checklist garbage',
+        type: testTypeId,
+        group: testGroupId,
+        priority: testPriorityId,
+        checklist: 'garbage'
+      })
       .end(function (_err, res) {
         expect(res.status).to.equal(400)
         expect(res.body.success).to.be.false

@@ -1,6 +1,9 @@
 const RecurringTask = require('../../../models/recurringTask')
 const apiUtil = require('../apiUtils')
-const parseChecklist = require('./checklistParser')
+const { parseChecklistField } = require('./checklistParser')
+
+const REQUIRED_REF_FIELDS = ['ticketType', 'ticketGroup', 'ticketPriority']
+const SCHEDULE_FIELDS = ['scheduleType', 'dayOfMonth', 'monthsOfYear', 'daysBeforeDeadline']
 
 const recurringTasksApi = {}
 
@@ -30,11 +33,15 @@ recurringTasksApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)
 
-  let checklist
-  if (postData.checklist !== undefined) {
-    checklist = parseChecklist(postData.checklist)
-    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
+  for (let i = 0; i < REQUIRED_REF_FIELDS.length; i++) {
+    const field = REQUIRED_REF_FIELDS[i]
+    if (!postData[field]) {
+      return apiUtil.sendApiError(res, 400, 'Invalid Parameters: ' + field + ' is required')
+    }
   }
+
+  const checklistResult = parseChecklistField(postData.checklist)
+  if (!checklistResult.ok) return apiUtil.sendApiError(res, 400, checklistResult.error)
 
   try {
     let task = await RecurringTask.create({
@@ -47,7 +54,7 @@ recurringTasksApi.create = async function (req, res) {
       ticketPriority: postData.ticketPriority,
       ticketAssignee: postData.ticketAssignee,
       ticketTags: postData.ticketTags,
-      checklist,
+      checklist: checklistResult.checklist,
       scheduleType: postData.scheduleType,
       dayOfMonth: postData.dayOfMonth,
       monthsOfYear: postData.monthsOfYear,
@@ -59,6 +66,7 @@ recurringTasksApi.create = async function (req, res) {
     task = await RecurringTask.getById(task._id)
     return apiUtil.sendApiSuccess(res, { recurringTask: task })
   } catch (err) {
+    if (err.name === 'ValidationError') return apiUtil.sendApiError(res, 400, err.message)
     return apiUtil.sendApiError(res, 500, err.message)
   }
 }
@@ -68,11 +76,8 @@ recurringTasksApi.update = async function (req, res) {
   const postData = req.body
   if (!id || !postData) return apiUtil.sendApiError(res, 400, 'Invalid Parameters')
 
-  let checklist
-  if (postData.checklist !== undefined) {
-    checklist = parseChecklist(postData.checklist)
-    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
-  }
+  const checklistResult = parseChecklistField(postData.checklist)
+  if (!checklistResult.ok) return apiUtil.sendApiError(res, 400, checklistResult.error)
 
   try {
     let task = await RecurringTask.findById(id)
@@ -86,22 +91,28 @@ recurringTasksApi.update = async function (req, res) {
 
     for (let i = 0; i < allowedFields.length; i++) {
       const field = allowedFields[i]
-      if (postData[field] !== undefined) {
-        task[field] = postData[field]
-      }
+      if (postData[field] === undefined) continue
+      // Required refs cannot be unset - treat an explicit null as "leave unchanged"
+      if (postData[field] === null && REQUIRED_REF_FIELDS.indexOf(field) !== -1) continue
+      task[field] = postData[field]
     }
 
-    if (checklist !== undefined) {
-      task.checklist = checklist
+    if (checklistResult.checklist !== undefined) {
+      task.checklist = checklistResult.checklist
     }
 
-    // Recalculate next run when schedule changes
-    task.nextRun = RecurringTask.calculateNextRun(task)
+    // Recalculate next run only when the schedule actually changed, otherwise a
+    // due task (nextRun in the past) would lose its pending run on unrelated edits
+    const scheduleChanged = SCHEDULE_FIELDS.some(f => task.isModified(f))
+    if (scheduleChanged) {
+      task.nextRun = RecurringTask.calculateNextRun(task)
+    }
 
     await task.save()
     task = await RecurringTask.getById(task._id)
     return apiUtil.sendApiSuccess(res, { recurringTask: task })
   } catch (err) {
+    if (err.name === 'ValidationError') return apiUtil.sendApiError(res, 400, err.message)
     return apiUtil.sendApiError(res, 500, err.message)
   }
 }
