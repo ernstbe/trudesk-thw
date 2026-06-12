@@ -119,6 +119,13 @@ const ticketSchema = mongoose.Schema({
     completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'accounts' },
     completedAt: { type: Date }
   }],
+  // Bidirectional ticket links: an entry is stored on BOTH tickets.
+  // 'blockedBy' is the internal inverse of 'blocks' written to the target
+  // ticket — it is not accepted as client input (see api/v2/tickets.js).
+  linkedTickets: [{
+    ticket: { type: mongoose.Schema.Types.ObjectId, ref: 'tickets', required: true },
+    linkType: { type: String, enum: ['related', 'duplicate', 'blocks', 'blockedBy'], default: 'related' }
+  }],
   subscribers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'accounts' }]
 })
 
@@ -915,6 +922,11 @@ ticketSchema.statics.getTicketByUid = async function (uid) {
       'username fullname email role image title'
     )
     .populate('type tags status group')
+    .populate({
+      path: 'linkedTickets.ticket',
+      select: 'uid subject status',
+      populate: { path: 'status', select: 'name htmlColor isResolved' }
+    })
     .exec()
 }
 

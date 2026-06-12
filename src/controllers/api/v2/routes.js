@@ -75,6 +75,9 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v2/tickets/:uid/checklist', apiv2Auth, canUser('tickets:update'), apiv2.tickets.checklist.add)
   router.put('/api/v2/tickets/:uid/checklist/:itemId', apiv2Auth, canUser('tickets:update'), apiv2.tickets.checklist.update)
   router.delete('/api/v2/tickets/:uid/checklist/:itemId', apiv2Auth, canUser('tickets:update'), apiv2.tickets.checklist.remove)
+  // Linked tickets (bidirectional)
+  router.post('/api/v2/tickets/:uid/links', apiv2Auth, canUser('tickets:update'), apiv2.tickets.links.add)
+  router.delete('/api/v2/tickets/:uid/links/:targetUid', apiv2Auth, canUser('tickets:update'), apiv2.tickets.links.remove)
   router.delete('/api/v2/tickets/:uid', apiv2Auth, canUser('tickets:delete'), apiv2.tickets.delete)
   router.delete('/api/v2/tickets/deleted/:id', apiv2Auth, isAdmin, apiv2.tickets.permDelete)
 
