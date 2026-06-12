@@ -23,6 +23,7 @@ const permissions = require('../../../permissions')
 const ticketStatusSchema = require('../../../models/ticketStatus')
 const { getDeadlineStatus } = require('../../../helpers/deadlineHelper')
 const { resolveDefaultTicketStatus } = require('../../../helpers/defaultTicketStatus')
+const { parseChecklistField } = require('./checklistParser')
 
 const ticketsV2 = {}
 
@@ -34,6 +35,12 @@ ticketsV2.create = async function (req, res) {
   if (!postData.group) {
     return apiUtils.sendApiError(res, 400, 'Invalid Post Data: group is required')
   }
+
+  // Never let the checklist pass through the schema cast unvalidated - clients could
+  // inject completed/completedBy. Parse it explicitly and set sanitized items below.
+  const checklistResult = parseChecklistField(postData.checklist)
+  if (!checklistResult.ok) return apiUtils.sendApiError(res, 400, checklistResult.error)
+  delete postData.checklist
 
   try {
     const user = await Models.User.findOne({ _id: req.user._id })
@@ -68,6 +75,10 @@ ticketsV2.create = async function (req, res) {
     // Always use the authenticated user as owner (prevent IDOR)
     ticket.owner = req.user._id
     ticket.status = status._id
+
+    if (checklistResult.checklist !== undefined) {
+      ticket.checklist = checklistResult.checklist.map(i => ({ title: i.title, completed: false }))
+    }
 
     ticket.subject = sanitizeHtml(ticket.subject).trim()
     if (ticket.issue) {

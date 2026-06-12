@@ -1,6 +1,6 @@
 const TicketTemplate = require('../../../models/ticketTemplate')
 const apiUtil = require('../apiUtils')
-const parseChecklist = require('./checklistParser')
+const { parseChecklistField } = require('./checklistParser')
 
 const ticketTemplatesApi = {}
 
@@ -30,11 +30,8 @@ ticketTemplatesApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)
 
-  let checklist
-  if (postData.checklist !== undefined) {
-    checklist = parseChecklist(postData.checklist)
-    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
-  }
+  const checklistResult = parseChecklistField(postData.checklist)
+  if (!checklistResult.ok) return apiUtil.sendApiError(res, 400, checklistResult.error)
 
   try {
     let template = await TicketTemplate.create({
@@ -45,7 +42,7 @@ ticketTemplatesApi.create = async function (req, res) {
       group: postData.group,
       priority: postData.priority,
       tags: postData.tags,
-      checklist,
+      checklist: checklistResult.checklist,
       createdBy: req.user._id
     })
 
@@ -61,11 +58,8 @@ ticketTemplatesApi.update = async function (req, res) {
   const postData = req.body
   if (!id || !postData) return apiUtil.sendApiError(res, 400, 'Invalid Parameters')
 
-  let checklist
-  if (postData.checklist !== undefined) {
-    checklist = parseChecklist(postData.checklist)
-    if (checklist === null) return apiUtil.sendApiError(res, 400, 'Invalid Parameters: checklist must be an array')
-  }
+  const checklistResult = parseChecklistField(postData.checklist)
+  if (!checklistResult.ok) return apiUtil.sendApiError(res, 400, checklistResult.error)
 
   try {
     let template = await TicketTemplate.findById(id)
@@ -80,8 +74,8 @@ ticketTemplatesApi.update = async function (req, res) {
       }
     }
 
-    if (checklist !== undefined) {
-      template.checklist = checklist
+    if (checklistResult.checklist !== undefined) {
+      template.checklist = checklistResult.checklist
     }
 
     await template.save()
