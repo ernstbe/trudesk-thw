@@ -16,7 +16,7 @@
     "codacy": "npm run coverage && bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r ./coverage/lcov.info && rm -rf ./coverage",
     "webpackwatch": "webpack --config webpack.config.js --watch",
     "webpackdev": "webpack --config webpack.config.js",
-    "webpackdist": "rimraf public/js/* && cross-env NODE_ENV=production webpack --env production --config webpack.config.js"
+    "webpackdist": "rimraf --glob \"public/js/*\" && cross-env NODE_ENV=production webpack --env production --config webpack.config.js"
   },
   "dependencies": {
     "@elastic/elasticsearch": "9.4.1",
