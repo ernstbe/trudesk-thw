@@ -10,6 +10,8 @@
  */
 
 const sanitizeHtml = require('sanitize-html')
+const groupSchema = require('../../models/group')
+const departmentSchema = require('../../models/department')
 
 /**
  * Applies the editable fields of a PUT ticket payload onto a ticket document.
@@ -24,12 +26,16 @@ const sanitizeHtml = require('sanitize-html')
  *
  * Throws `Error('Invalid dueDate')` for unparsable due dates and propagates
  * model errors (e.g. `Invalid Type Id`). Callers map those to a 400 response.
+ * Moving the ticket into a group the user cannot see throws an error with
+ * `statusCode = 403`, which callers map to a 403 response.
  *
  * @param {Object} ticket Mongoose ticket document to mutate
  * @param {Object} reqTicket Request payload with the fields to update
- * @param {Object} userId Account ID performing this action (history owner)
+ * @param {Object} user Account performing this action (history owner; role
+ *                      must be populated for the group access check)
  */
-async function applyTicketUpdate (ticket, reqTicket, userId) {
+async function applyTicketUpdate (ticket, reqTicket, user) {
+  const userId = user._id
   if (reqTicket.status !== undefined) {
     ticket.status = reqTicket.status
   }
@@ -39,6 +45,32 @@ async function applyTicketUpdate (ticket, reqTicket, userId) {
   }
 
   if (reqTicket.group !== undefined) {
+    const requestedGroupId = (reqTicket.group._id || reqTicket.group).toString()
+    const currentGroupId = ticket.group ? (ticket.group._id || ticket.group).toString() : null
+
+    // Moving a ticket into another group is gated the same way ticket
+    // create is (PR #97): the caller must be able to see the target group.
+    // Admins/agents are matched against their team→department mapping,
+    // everyone else against direct group membership. Without this, anyone
+    // holding the generic tickets:update grant (the default user role has
+    // it) could move tickets into arbitrary groups.
+    if (requestedGroupId !== currentGroupId) {
+      let allowedGroupIds
+      if (user.role.isAdmin || user.role.isAgent) {
+        const dbGroups = await departmentSchema.getDepartmentGroupsOfUser(userId)
+        allowedGroupIds = dbGroups.map(g => g._id.toString())
+      } else {
+        const dbGroups = await groupSchema.getAllGroupsOfUser(userId)
+        allowedGroupIds = dbGroups.map(g => g._id.toString())
+      }
+
+      if (!allowedGroupIds.includes(requestedGroupId)) {
+        const err = new Error('Forbidden: group not accessible to this user')
+        err.statusCode = 403
+        throw err
+      }
+    }
+
     ticket.group = reqTicket.group._id || reqTicket.group
     await ticket.populate('group')
   }

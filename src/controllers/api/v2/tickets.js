@@ -255,7 +255,7 @@ ticketsV2.update = async function (req, res) {
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
     const { applyTicketUpdate } = require('../ticketUpdateHelper')
-    await applyTicketUpdate(ticket, putTicket, req.user._id)
+    await applyTicketUpdate(ticket, putTicket, req.user)
 
     const savedTicket = await ticket.save()
 
@@ -263,6 +263,11 @@ ticketsV2.update = async function (req, res) {
 
     return apiUtils.sendApiSuccess(res, { ticket: savedTicket })
   } catch (err) {
+    // Group moves into a group the caller cannot see are rejected by the
+    // update helper with statusCode=403 (same gate as ticket create, PR #97).
+    if (err.statusCode === 403) {
+      return apiUtils.sendApiError(res, 403, err.message)
+    }
     // Bad input → 400 (v2 convention since the recurringTasks endpoints):
     //  - ValidationError: schema cast failures on save (e.g. bogus status id)
     //  - 'Invalid dueDate' / 'Invalid Type Id: …': thrown by the update helper

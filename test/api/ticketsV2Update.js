@@ -48,6 +48,12 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
 
     secondGroup = await groupSchema.create({ name: 'V2 Update Target Group' })
 
+    // The update helper now enforces the same group access check as ticket
+    // create: the admin reaches groups via team→department, so the move
+    // target has to live in the seeded TEST Department too.
+    const departmentSchema = require('../../src/models/department')
+    await departmentSchema.updateOne({ name: 'TEST Department' }, { $push: { groups: secondGroup._id } })
+
     // A user whose role lacks tickets:update — must be rejected by the
     // canUser('tickets:update') gate on the route.
     restrictedRole = await roleSchema.create({
@@ -103,7 +109,11 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
 
   after(async function () {
     if (ticketId) await ticketModel.deleteOne({ _id: ticketId })
-    if (secondGroup) await groupSchema.deleteOne({ _id: secondGroup._id })
+    if (secondGroup) {
+      const departmentSchema = require('../../src/models/department')
+      await departmentSchema.updateOne({ name: 'TEST Department' }, { $pull: { groups: secondGroup._id } })
+      await groupSchema.deleteOne({ _id: secondGroup._id })
+    }
     if (restrictedUser) await userSchema.deleteOne({ _id: restrictedUser._id })
     if (restrictedRole) {
       await roleSchema.deleteOne({ _id: restrictedRole._id })
