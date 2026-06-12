@@ -624,6 +624,121 @@ ticketsV2.checklist.remove = async function (req, res) {
 }
 
 // -------------------------------------------------------------------
+// Linked tickets — POST /api/v2/tickets/:uid/links
+//                  DELETE /api/v2/tickets/:uid/links/:targetUid
+//
+// Links are stored BIDIRECTIONALLY: each link writes an entry into the
+// linkedTickets array of both tickets so either side sees the relation
+// without an aggregation query and both tickets emit 'ticket:updated'
+// through the post-save hook. For 'blocks' the target ticket stores the
+// inverse type 'blockedBy' (schema-internal, not valid client input).
+// -------------------------------------------------------------------
+const LINK_TYPES = ['related', 'duplicate', 'blocks']
+const INVERSE_LINK_TYPE = { related: 'related', duplicate: 'duplicate', blocks: 'blockedBy' }
+
+ticketsV2.links = {}
+
+ticketsV2.links.add = async function (req, res) {
+  const uid = req.params.uid
+  const body = req.body || {}
+  const targetUid = body.targetUid
+  const linkType = body.linkType === undefined ? 'related' : body.linkType
+
+  if (!uid || targetUid === undefined || targetUid === null) {
+    return apiUtils.sendApiError(res, 400, 'Invalid Parameters: targetUid is required')
+  }
+  if (!LINK_TYPES.includes(linkType)) {
+    return apiUtils.sendApiError(res, 400, 'Invalid linkType (allowed: ' + LINK_TYPES.join(', ') + ')')
+  }
+  if (uid.toString() === targetUid.toString()) {
+    return apiUtils.sendApiError(res, 400, 'Cannot link a ticket to itself')
+  }
+
+  try {
+    const ticket = await Models.Ticket.getTicketByUid(uid)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    const target = await Models.Ticket.getTicketByUid(targetUid)
+    if (!target) return apiUtils.sendApiError(res, 404, 'Target ticket not found')
+
+    const alreadyLinked = (ticket.linkedTickets || []).some(
+      l => l.ticket && l.ticket._id.toString() === target._id.toString()
+    )
+    if (alreadyLinked) return apiUtils.sendApiError(res, 400, 'Tickets are already linked')
+
+    ticket.linkedTickets.push({ ticket: target._id, linkType })
+    ticket.history.push({
+      action: 'ticket:link:added',
+      description: 'Linked to ticket #' + target.uid + ' (' + linkType + ')',
+      owner: req.user._id
+    })
+
+    target.linkedTickets.push({ ticket: ticket._id, linkType: INVERSE_LINK_TYPE[linkType] })
+    target.history.push({
+      action: 'ticket:link:added',
+      description: 'Linked to ticket #' + ticket.uid + ' (' + INVERSE_LINK_TYPE[linkType] + ')',
+      owner: req.user._id
+    })
+
+    await ticket.save()
+    await target.save()
+
+    // Re-fetch so linkedTickets.ticket is populated (uid/subject/status)
+    const populated = await Models.Ticket.getTicketByUid(uid)
+    return apiUtils.sendApiSuccess(res, { ticket: populated })
+  } catch (err) {
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
+}
+
+ticketsV2.links.remove = async function (req, res) {
+  const uid = req.params.uid
+  const targetUid = req.params.targetUid
+  if (!uid || !targetUid) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
+
+  try {
+    const ticket = await Models.Ticket.getTicketByUid(uid)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    const target = await Models.Ticket.getTicketByUid(targetUid)
+    if (!target) return apiUtils.sendApiError(res, 404, 'Target ticket not found')
+
+    const hadLink = (ticket.linkedTickets || []).some(
+      l => l.ticket && l.ticket._id.toString() === target._id.toString()
+    )
+    if (!hadLink) return apiUtils.sendApiError(res, 404, 'Link not found')
+
+    ticket.linkedTickets = ticket.linkedTickets.filter(
+      l => !l.ticket || l.ticket._id.toString() !== target._id.toString()
+    )
+    ticket.history.push({
+      action: 'ticket:link:removed',
+      description: 'Link to ticket #' + target.uid + ' removed',
+      owner: req.user._id
+    })
+
+    target.linkedTickets = (target.linkedTickets || []).filter(
+      l => !l.ticket || l.ticket._id.toString() !== ticket._id.toString()
+    )
+    target.history.push({
+      action: 'ticket:link:removed',
+      description: 'Link to ticket #' + ticket.uid + ' removed',
+      owner: req.user._id
+    })
+
+    await ticket.save()
+    await target.save()
+
+    const populated = await Models.Ticket.getTicketByUid(uid)
+    return apiUtils.sendApiSuccess(res, { ticket: populated })
+  } catch (err) {
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
+}
+
+// -------------------------------------------------------------------
 // Comments — POST /api/v2/tickets/:uid/comments
 // Port of v1 apiTickets.postComment. Differences:
 //   - uses :uid in the path instead of an _id in the body
