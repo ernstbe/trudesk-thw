@@ -235,16 +235,42 @@ ticketsV2.single = async function (req, res) {
   }
 }
 
+// -------------------------------------------------------------------
+// Update — PUT /api/v2/tickets/:uid
+// Body: { ticket: { ...fields } }. Persists the same field whitelist as
+// v1 apiTickets.update via the shared ticketUpdateHelper (status, subject,
+// group, priority, type, dueDate incl. null=clear, closedDate, tags,
+// issue, assignee). Non-whitelisted fields are ignored. The permission
+// gate (tickets:update) sits in the route middleware, matching the check
+// v1 performs in-handler. The model's post-save hook emits 'ticket:updated'
+// so realtime clients pick the change up automatically.
+// -------------------------------------------------------------------
 ticketsV2.update = async function (req, res) {
   const uid = req.params.uid
   const putTicket = req.body.ticket
   if (!uid || !putTicket) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
 
   try {
-    // todo: complete this...
     const ticket = await Models.Ticket.getTicketByUid(uid)
-    return apiUtils.sendApiSuccess(res, ticket)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    const { applyTicketUpdate } = require('../ticketUpdateHelper')
+    await applyTicketUpdate(ticket, putTicket, req.user._id)
+
+    const savedTicket = await ticket.save()
+
+    if (!permissions.canThis(req.user.role, 'tickets:notes')) savedTicket.notes = []
+
+    return apiUtils.sendApiSuccess(res, { ticket: savedTicket })
   } catch (err) {
+    // Bad input → 400 (v2 convention since the recurringTasks endpoints):
+    //  - ValidationError: schema cast failures on save (e.g. bogus status id)
+    //  - 'Invalid dueDate' / 'Invalid Type Id: …': thrown by the update helper
+    //    and the ticket model for unparsable / unknown reference values
+    if (err.name === 'ValidationError' || err.name === 'CastError' || /^Invalid /.test(err.message || '')) {
+      return apiUtils.sendApiError(res, 400, err.message)
+    }
+    logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
 }

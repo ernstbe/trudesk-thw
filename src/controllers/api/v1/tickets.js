@@ -721,78 +721,12 @@ apiTickets.update = async function (req, res) {
       const ticket = await ticketModel.getTicketById(oId)
       if (!ticket) return res.status(400).json({ success: false, error: 'Unable to locate ticket. Aborting...' })
 
-      if (reqTicket.status !== undefined) {
-        ticket.status = reqTicket.status
-      }
-
-      if (reqTicket.subject !== undefined) {
-        ticket.subject = sanitizeHtml(reqTicket.subject).trim()
-      }
-
-      if (reqTicket.group !== undefined) {
-        ticket.group = reqTicket.group._id || reqTicket.group
-        await ticket.populate('group')
-      }
-
-      if (reqTicket.priority !== undefined) {
-        ticket.priority = reqTicket.priority._id || reqTicket.priority
-        await ticket.populate('priority')
-      }
-
-      // Type was silently dropped here previously — every PWA `Type` chip
-      // change ended up as a no-op. Route it through the schema helper
-      // so we get the existing 'ticket:set:type' history entry plus a
-      // proper "type does not exist" error if the id is bad.
-      if (reqTicket.type !== undefined) {
-        const typeId = reqTicket.type._id || reqTicket.type
-        await ticket.setTicketType(req.user._id, typeId)
-        await ticket.populate('type')
-      }
-
-      // Same silent-drop class as the type field above: due-date edits
-      // from the PWA returned success while persisting nothing. `null`
-      // clears the date; skip identical values so plain subject/issue
-      // updates don't spam the history with duedate entries.
-      if (reqTicket.dueDate !== undefined) {
-        const newDueDate = reqTicket.dueDate === null ? null : new Date(reqTicket.dueDate)
-        if (newDueDate !== null && isNaN(newDueDate.getTime())) {
-          return res.status(400).json({ success: false, error: 'Invalid dueDate' })
-        }
-
-        const currentTime = ticket.dueDate ? new Date(ticket.dueDate).getTime() : null
-        const newTime = newDueDate === null ? null : newDueDate.getTime()
-        if (currentTime !== newTime) {
-          ticket.setTicketDueDate(req.user._id, newDueDate)
-        }
-      }
-
-      if (reqTicket.closedDate !== undefined) {
-        ticket.closedDate = reqTicket.closedDate
-      }
-
-      if (reqTicket.tags !== undefined && reqTicket.tags !== null) {
-        ticket.tags = reqTicket.tags
-      }
-
-      if (reqTicket.issue !== undefined && reqTicket.issue !== null) {
-        ticket.issue = sanitizeHtml(reqTicket.issue).trim()
-      }
-
-      if (reqTicket.assignee !== undefined && reqTicket.assignee !== null) {
-        ticket.assignee = reqTicket.assignee._id || reqTicket.assignee
-        await ticket.populate('assignee')
-
-        const assigneeName = ticket.assignee && ticket.assignee.fullname
-          ? ticket.assignee.fullname
-          : 'Unknown'
-        const HistoryItem = {
-          action: 'ticket:set:assignee',
-          description: assigneeName + ' was set as assignee',
-          owner: req.user._id
-        }
-
-        ticket.history.push(HistoryItem)
-      }
+      // Field whitelist + history semantics live in the shared helper so the
+      // v2 update endpoint persists exactly the same fields as this one.
+      // It throws Error('Invalid dueDate') for unparsable dates, which the
+      // catch below maps to the same 400 response as before.
+      const { applyTicketUpdate } = require('../ticketUpdateHelper')
+      await applyTicketUpdate(ticket, reqTicket, req.user._id)
 
       const savedTicket = await ticket.save()
 
