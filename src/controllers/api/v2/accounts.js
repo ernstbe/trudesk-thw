@@ -50,6 +50,126 @@ accountsApi.sessionUser = async (req, res) => {
   }
 }
 
+// DSGVO Art. 15 data export — returns everything stored about the
+// AUTHENTICATED user as a single human-readable JSON document. The user id
+// is taken exclusively from `req.user._id` (set by apiv2Auth); no id from
+// query/params/body is ever consulted, so a user can never export someone
+// else's data (IDOR-safe by construction). All refs are resolved to plain
+// names so a layperson can read the file without knowing ObjectIds.
+//
+// This endpoint deliberately does NOT use apiUtil.sendApiSuccess: the JSON
+// body IS the deliverable file the browser should save, so wrapping it in
+// the `{ success: true, ... }` API envelope would leak transport plumbing
+// into the user's personal data export. Errors still go through
+// sendApiError so clients get the familiar shape on failure.
+accountsApi.exportMyData = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+
+  try {
+    const Ticket = require('../../../models/ticket')
+    const userId = req.user._id
+
+    const dbUser = await User.findOne({ _id: userId })
+      .select('username fullname email title workNumber mobileNumber role')
+      .populate('role', 'name')
+      .lean()
+    if (!dbUser) return apiUtil.sendApiError(res, 404, 'Invalid User')
+
+    const profile = {
+      fullname: dbUser.fullname,
+      username: dbUser.username,
+      email: dbUser.email,
+      title: dbUser.title || null,
+      workNumber: dbUser.workNumber || null,
+      mobileNumber: dbUser.mobileNumber || null,
+      role: dbUser.role ? dbUser.role.name : null,
+      // The schema has no createdAt field — the ObjectId carries the
+      // creation timestamp, so derive it from there.
+      createdAt: dbUser._id.getTimestamp()
+    }
+
+    // (b) Tickets the user opened. Soft-deleted tickets are still stored
+    // data about the user, so they are included — DSGVO asks for what is
+    // stored, not what is visible in the UI.
+    const ownedTickets = await Ticket.find({ owner: userId })
+      .select('uid subject issue status type priority group date updated closedDate dueDate tags checklist deleted')
+      .populate([
+        { path: 'status', select: 'name' },
+        { path: 'type', select: 'name' },
+        { path: 'priority', select: 'name' },
+        { path: 'group', select: 'name' },
+        { path: 'tags', select: 'name' }
+      ])
+      .sort({ uid: 1 })
+      .lean()
+
+    const tickets = ownedTickets.map(t => ({
+      uid: t.uid,
+      subject: t.subject,
+      issue: t.issue,
+      status: t.status ? t.status.name : null,
+      type: t.type ? t.type.name : null,
+      priority: t.priority ? t.priority.name : null,
+      group: t.group ? t.group.name : null,
+      dueDate: t.dueDate || null,
+      createdAt: t.date,
+      updatedAt: t.updated || null,
+      closedDate: t.closedDate || null,
+      deleted: t.deleted === true,
+      tags: (t.tags || []).map(tag => tag.name),
+      checklist: (t.checklist || []).map(item => ({
+        title: item.title,
+        completed: item.completed === true,
+        completedAt: item.completedAt || null
+      }))
+    }))
+
+    // (c)+(d)+(e) Own comments, notes and uploaded attachments — including
+    // those on OTHER users' tickets. One query fetches every ticket the
+    // user contributed to; the subdocuments are filtered by owner in JS.
+    const contributedTickets = await Ticket.find({
+      $or: [{ 'comments.owner': userId }, { 'notes.owner': userId }, { 'attachments.owner': userId }]
+    })
+      .select('uid subject comments notes attachments')
+      .lean()
+
+    const comments = []
+    const notes = []
+    const attachments = []
+    const uid = String(userId)
+    for (const t of contributedTickets) {
+      const context = { ticketUid: t.uid, ticketSubject: t.subject }
+      for (const c of t.comments || []) {
+        if (c.owner && String(c.owner) === uid) comments.push({ ...context, date: c.date, comment: c.comment })
+      }
+      for (const n of t.notes || []) {
+        if (n.owner && String(n.owner) === uid) notes.push({ ...context, date: n.date, note: n.note })
+      }
+      for (const a of t.attachments || []) {
+        if (a.owner && String(a.owner) === uid) attachments.push({ ...context, date: a.date, filename: a.name })
+      }
+    }
+
+    const exportDoc = {
+      exportedAt: new Date(),
+      description:
+        'Datenexport gemäß Art. 15 DSGVO — alle zu Ihrem Benutzerkonto gespeicherten personenbezogenen Daten.',
+      profile,
+      tickets,
+      comments,
+      notes,
+      attachments
+    }
+
+    const datestamp = new Date().toISOString().substring(0, 10)
+    res.setHeader('Content-Disposition', `attachment; filename="datenexport-${dbUser.username}-${datestamp}.json"`)
+    return res.json(exportDoc)
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
 accountsApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)
