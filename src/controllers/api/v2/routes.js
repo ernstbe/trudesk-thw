@@ -32,6 +32,10 @@ module.exports = function (middleware, router, controllers) {
   // Accounts
   router.get('/api/v2/accounts', apiv2Auth, canUser('accounts:view'), apiv2.accounts.get)
   router.post('/api/v2/accounts', apiv2Auth, canUser('accounts:create'), apiv2.accounts.create)
+  // Static /accounts/me/* segment registered BEFORE the parameterized
+  // /accounts/:username route so Express never matches "me" as a username.
+  // No extra grant: every authenticated user may export their OWN data.
+  router.get('/api/v2/accounts/me/export', apiv2Auth, apiv2.accounts.exportMyData)
   router.put('/api/v2/accounts/profile', apiv2Auth, apiv2.accounts.saveProfile)
   router.post('/api/v2/accounts/profile/mfa', apiv2Auth, apiv2.accounts.generateMFA)
   router.post('/api/v2/accounts/profile/mfa/verify', apiv2Auth, apiv2.accounts.verifyMFA)
