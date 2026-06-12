@@ -127,4 +127,44 @@ describe('recurringTask.js', function () {
       expect(saved.updatedAt.getTime()).to.be.at.least(oldUpdated.getTime())
     }
   })
+
+  it('should store checklist items', async function () {
+    const task = await recurringTaskSchema.create({
+      name: 'Wartung mit Checkliste',
+      ticketSubject: 'Wartung faellig',
+      ticketIssue: 'Bitte Checkliste abarbeiten',
+      ticketType: new m.Types.ObjectId(),
+      ticketGroup: new m.Types.ObjectId(),
+      ticketPriority: new m.Types.ObjectId(),
+      scheduleType: 'monthly',
+      checklist: [{ title: 'Filter pruefen' }, { title: 'Oelstand kontrollieren' }],
+      createdBy: new m.Types.ObjectId()
+    })
+
+    expect(task.checklist).to.have.length(2)
+    expect(task.checklist[0].title).to.equal('Filter pruefen')
+    expect(task.checklist[1].title).to.equal('Oelstand kontrollieren')
+  })
+
+  it('should require a title for checklist items', async function () {
+    let error
+    try {
+      await recurringTaskSchema.create({
+        name: 'Checkliste ohne Titel',
+        ticketSubject: 'Wartung faellig',
+        ticketIssue: 'Bitte Checkliste abarbeiten',
+        ticketType: new m.Types.ObjectId(),
+        ticketGroup: new m.Types.ObjectId(),
+        ticketPriority: new m.Types.ObjectId(),
+        scheduleType: 'monthly',
+        checklist: [{}],
+        createdBy: new m.Types.ObjectId()
+      })
+    } catch (err) {
+      error = err
+    }
+
+    expect(error).to.exist
+    expect(error.name).to.equal('ValidationError')
+  })
 })

@@ -14,6 +14,11 @@ const recurringTaskSchema = mongoose.Schema({
   ticketPriority: { type: mongoose.Schema.Types.ObjectId, ref: 'priorities', required: true },
   ticketAssignee: { type: mongoose.Schema.Types.ObjectId, ref: 'accounts' },
   ticketTags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'tags' }],
+  checklist: [
+    {
+      title: { type: String, required: true }
+    }
+  ],
 
   // Scheduling
   scheduleType: { type: String, enum: ['monthly', 'quarterly', 'annual'], required: true },
