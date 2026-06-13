@@ -291,16 +291,11 @@ ticketsV2.batchUpdate = async function (req, res) {
       const ticket = await Models.Ticket.getTicketById(batchTicket.id)
 
       if (batchTicket.status !== undefined) {
-        ticket.status = batchTicket.status
-        ticket.history.push({
-          action: 'ticket:set:status',
-          description: 'status set to: ' + batchTicket.status,
-          owner: req.user._id
-        })
+        await ticket.setStatus(req.user._id, batchTicket.status)
       }
 
       if (batchTicket.assignee !== undefined) {
-        const previousAssigneeId = ticket.assignee ? ticket.assignee.toString() : null
+        const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
         ticket.assignee = batchTicket.assignee || undefined
         ticket.history.push({
           action: 'ticket:set:assignee',
@@ -762,7 +757,7 @@ ticketsV2.postComment = async function (req, res) {
     const comment = sanitizeHtml(body.comment).trim()
 
     const commentDoc = {
-      owner: body.ownerId || req.user._id,
+      owner: req.user._id,
       date: new Date(),
       comment: xss(marked.parse(comment))
     }
@@ -772,7 +767,7 @@ ticketsV2.postComment = async function (req, res) {
     ticket.history.push({
       action: 'ticket:comment:added',
       description: 'Comment was added',
-      owner: commentDoc.owner
+      owner: req.user._id
     })
 
     const saved = await ticket.save()
@@ -799,10 +794,13 @@ ticketsV2.postNote = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    marked.setOptions({ breaks: true })
+    const note = sanitizeHtml(body.note).trim()
+
     const noteDoc = {
-      owner: body.ownerId || req.user._id,
+      owner: req.user._id,
       date: new Date(),
-      note: xss(marked.parse(body.note))
+      note: xss(marked.parse(note))
     }
 
     ticket.updated = Date.now()
@@ -810,7 +808,7 @@ ticketsV2.postNote = async function (req, res) {
     ticket.history.push({
       action: 'ticket:note:added',
       description: 'Internal note was added',
-      owner: noteDoc.owner
+      owner: req.user._id
     })
 
     let saved = await ticket.save()
@@ -903,7 +901,7 @@ ticketsV2.getGroupStats = async function (req, res) {
     const tickets = await Models.Ticket.getTicketsWithObject([groupId], { limit: 10000, page: 0 })
     if (!tickets || tickets.length === 0) return apiUtils.sendApiError(res, 404, 'Group has no tickets to report')
 
-    const closed = tickets.filter(t => t.status === 3)
+    const closed = tickets.filter(t => isResolvedStatus(t.status))
     return apiUtils.sendApiSuccess(res, {
       ticketCount: tickets.length,
       closedCount: closed.length,

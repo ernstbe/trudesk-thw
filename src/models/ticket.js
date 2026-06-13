@@ -1085,7 +1085,8 @@ ticketSchema.statics.getOverdue = async function (grpId) {
       status: { $in: statusesMapped },
       deleted: false
     })
-    .select('_id date updated')
+    .select('_id date updated priority')
+    .populate('priority', 'overdueIn')
     .lean()
     .exec()
 
