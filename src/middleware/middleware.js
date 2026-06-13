@@ -189,28 +189,39 @@ middleware.checkOrigin = function (req, res, next) {
 }
 
 // API
-middleware.api = async function (req, res, next) {
-  const accessToken = req.headers.accesstoken
+middleware.api = function (req, res, next) {
+  // ByPass auth if user is already set through session
+  if (req.user) return next()
 
-  const userSchema = require('../models/user')
+  // Parity with apiv2: also accept a Bearer JWT here so a pure-JWT client
+  // (e.g. the PWA after the v2/JWT migration) can still reach v1-only routes.
+  // Order: session (above) -> JWT -> legacy accesstoken header. We only 401
+  // once every method has failed, preserving 100% of existing accesstoken
+  // behavior (same error responses) for legacy v1 clients.
+  const passport = require('passport')
+  passport.authenticate('jwt', { session: false }, async function (_err, user) {
+    if (user) {
+      req.user = user
+      return next()
+    }
 
-  if (accessToken === undefined || accessToken === null) {
-    const user = req.user
-    if (user === undefined || user === null) return res.status(401).json({ error: 'Invalid Access Token' })
+    const accessToken = req.headers.accesstoken
+    if (accessToken === undefined || accessToken === null) {
+      return res.status(401).json({ error: 'Invalid Access Token' })
+    }
 
-    return next()
-  }
+    try {
+      const userSchema = require('../models/user')
+      const tokenUser = await userSchema.getUserByAccessToken(accessToken)
+      if (!tokenUser) return res.status(401).json({ error: 'Invalid Access Token' })
 
-  try {
-    const user = await userSchema.getUserByAccessToken(accessToken)
-    if (!user) return res.status(401).json({ error: 'Invalid Access Token' })
+      req.user = tokenUser
 
-    req.user = user
-
-    return next()
-  } catch (err) {
-    return res.status(401).json({ error: err.message })
-  }
+      return next()
+    } catch (err) {
+      return res.status(401).json({ error: err.message })
+    }
+  })(req, res, next)
 }
 
 middleware.hasAuth = middleware.api
