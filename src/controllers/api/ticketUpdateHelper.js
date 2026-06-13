@@ -120,6 +120,7 @@ async function applyTicketUpdate (ticket, reqTicket, user) {
   }
 
   if (reqTicket.assignee !== undefined && reqTicket.assignee !== null) {
+    const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
     ticket.assignee = reqTicket.assignee._id || reqTicket.assignee
     await ticket.populate('assignee')
 
@@ -133,6 +134,13 @@ async function applyTicketUpdate (ticket, reqTicket, user) {
     }
 
     ticket.history.push(HistoryItem)
+
+    // Notify the newly assigned user (skips self-assignment). Only on an
+    // actual change so a plain re-save with the same assignee stays quiet.
+    const newAssigneeId = ticket.assignee && ticket.assignee._id ? ticket.assignee._id.toString() : null
+    if (newAssigneeId && newAssigneeId !== previousAssigneeId) {
+      await require('../../helpers/notifyAssignee')(newAssigneeId, userId, ticket)
+    }
   }
 
   return ticket
