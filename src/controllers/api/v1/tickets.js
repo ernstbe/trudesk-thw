@@ -981,6 +981,10 @@ apiTickets.postComment = async function (req, res) {
       breaks: true
     })
 
+    // Turn newlines into <br> before marked.parse so blank lines the user
+    // typed survive — marked otherwise collapses any run of blank lines into a
+    // single paragraph break (mirrors the ticket issue handling above).
+    comment = comment.replace(/(\r\n|\n\r|\r|\n)/g, '<br>')
     comment = sanitizeHtml(comment).trim()
 
     const Comment = {
@@ -1055,10 +1059,15 @@ apiTickets.postInternalNote = async function (req, res) {
     if (payload.note === undefined) return res.status(400).json({ success: false, error: 'Invalid Post Data' })
 
     const marked = require('marked')
+    // Same blank-line preservation as comments/issues: turn newlines into <br>
+    // (and sanitize) before marked.parse so multi-line notes keep their empty
+    // lines instead of collapsing.
+    let noteText = payload.note.replace(/(\r\n|\n\r|\r|\n)/g, '<br>')
+    noteText = sanitizeHtml(noteText).trim()
     const Note = {
       owner: payload.owner || req.user._id,
       date: new Date(),
-      note: xss(marked.parse(payload.note))
+      note: xss(marked.parse(noteText))
     }
 
     ticket.updated = Date.now()

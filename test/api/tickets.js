@@ -176,6 +176,42 @@ describe('api/tickets.js', function () {
       .end(done)
   })
 
+  it('should preserve blank lines in a comment', function (done) {
+    api
+      .post('/api/v1/tickets/addcomment')
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ comment: 'Zeile A\n\n\nZeile B', _id: createdTicketId })
+      .expect(200)
+      .expect(function (res) {
+        expect(res.body.success).to.be.true
+        const comments = res.body.ticket.comments
+        const last = comments[comments.length - 1]
+        // Three newlines (two blank lines) must survive as <br> instead of
+        // collapsing into a single paragraph break.
+        const brCount = (last.comment.match(/<br/g) || []).length
+        expect(brCount).to.be.at.least(3)
+      })
+      .end(done)
+  })
+
+  it('should preserve blank lines in an internal note', function (done) {
+    api
+      .post('/api/v1/tickets/addnote')
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ note: 'Note A\n\n\nNote B', ticketid: createdTicketId })
+      .expect(200)
+      .expect(function (res) {
+        expect(res.body.success).to.be.true
+        const notes = res.body.ticket.notes
+        const last = notes[notes.length - 1]
+        const brCount = (last.note.match(/<br/g) || []).length
+        expect(brCount).to.be.at.least(3)
+      })
+      .end(done)
+  })
+
   it('should get ticket types', function (done) {
     api
       .get('/api/v1/tickets/types')
