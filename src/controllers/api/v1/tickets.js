@@ -876,8 +876,10 @@ apiTickets.setAdditionalAssignees = async function (req, res) {
     const t = await ticket.save()
     await t.populate('additionalAssignees', 'username fullname email role image title')
 
+    const notifyAssignee = require('../../../helpers/notifyAssignee')
     for (const id of newlyAdded) {
       emitter.emit('ticket:subscriber:update', { user: id, subscribe: true })
+      await notifyAssignee(id, user._id, t)
     }
 
     if (!permissions.canThis(user.role, 'tickets:notes')) {

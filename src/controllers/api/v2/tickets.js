@@ -300,12 +300,16 @@ ticketsV2.batchUpdate = async function (req, res) {
       }
 
       if (batchTicket.assignee !== undefined) {
+        const previousAssigneeId = ticket.assignee ? ticket.assignee.toString() : null
         ticket.assignee = batchTicket.assignee || undefined
         ticket.history.push({
           action: 'ticket:set:assignee',
           description: 'assignee set to: ' + (batchTicket.assignee || 'unassigned'),
           owner: req.user._id
         })
+        if (batchTicket.assignee && batchTicket.assignee.toString() !== previousAssigneeId) {
+          await require('../../../helpers/notifyAssignee')(batchTicket.assignee, req.user._id, ticket)
+        }
       }
 
       if (batchTicket.priority !== undefined) {
