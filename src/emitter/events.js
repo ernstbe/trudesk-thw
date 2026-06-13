@@ -163,7 +163,10 @@ const eventTicketCreated = require('./events/event_ticket_created')
 
       // Notification for ticket owner
       if (ticket.owner._id.toString() !== comment.owner.toString()) {
-        if (ticket.assignee === undefined || ticket.assignee._id.toString() !== comment.owner.toString()) {
+        // After populate an unset assignee is null (not undefined); use a
+        // falsy check so we don't deref ticket.assignee._id and throw — which
+        // the outer catch would swallow, dropping ALL notifications/emails.
+        if (!ticket.assignee || ticket.assignee._id.toString() !== comment.owner.toString()) {
           const notification = new NotificationSchema({
             owner: ticket.owner,
             title: 'Comment Added to Ticket#' + ticket.uid,
@@ -178,7 +181,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
       }
 
       // Notification for assignee
-      if (ticket.assignee !== undefined) {
+      if (ticket.assignee) {
         if (ticket.assignee._id.toString() !== comment.owner.toString()) {
           if (ticket.owner._id.toString() !== ticket.assignee._id.toString()) {
             const notification = new NotificationSchema({
@@ -207,7 +210,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
           // Skip if already getting a notification (owner or assignee)
           const alreadyNotified =
             (ticket.owner._id.toString() === mentionedUser._id.toString()) ||
-            (ticket.assignee !== undefined && ticket.assignee._id.toString() === mentionedUser._id.toString())
+            (ticket.assignee && ticket.assignee._id.toString() === mentionedUser._id.toString())
           if (alreadyNotified) continue
 
           const mentionNotification = new NotificationSchema({
