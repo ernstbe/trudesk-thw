@@ -531,6 +531,104 @@ accountsApi.saveProfile = async (req, res) => {
   }
 }
 
+// Upload the authenticated user's own profile picture. Unlike the legacy
+// /accounts/uploadimage (which trusts a form `_id` — IDOR-prone), this always
+// targets req.user._id. The image is square-cropped to 512px JPEG via sharp;
+// each upload gets a fresh filename to bust the browser cache and the previous
+// avatar is removed so files don't accumulate.
+accountsApi.uploadProfileImage = async (req, res) => {
+  const user = req.user
+  if (!user || !user._id) return apiUtil.sendApiError(res, 401, 'Invalid User Auth.')
+
+  const Busboy = require('busboy')
+  const path = require('path')
+  const MAX_BYTES = 5 * 1024 * 1024 // 5 MB pre-resize ceiling for avatars
+  let busboy
+  try {
+    busboy = Busboy({ headers: req.headers, limits: { files: 1, fileSize: MAX_BYTES } })
+  } catch (_err) {
+    return apiUtil.sendApiError(res, 400, 'Expected multipart/form-data')
+  }
+
+  const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+  let error = null
+  let truncated = false
+  let uploadedMime = null
+  const chunks = []
+
+  busboy.on('file', function (_name, file, info) {
+    const mimetype = info.mimeType || ''
+    if (ALLOWED_MIME.indexOf(mimetype) === -1) {
+      error = { status: 400, message: 'Invalid File Type' }
+      return file.resume()
+    }
+    uploadedMime = mimetype
+    file.on('limit', function () {
+      truncated = true
+      error = { status: 400, message: 'File too large (max 5 MB)' }
+    })
+    file.on('data', function (chunk) {
+      if (!error) chunks.push(chunk)
+    })
+  })
+
+  busboy.on('finish', async function () {
+    if (error || truncated) {
+      return apiUtil.sendApiError(res, error ? error.status : 400, error ? error.message : 'Upload failed')
+    }
+    if (!uploadedMime || chunks.length === 0) {
+      return apiUtil.sendApiError(res, 400, 'No file in request')
+    }
+
+    let buffer = Buffer.concat(chunks)
+    chunks.length = 0
+
+    try {
+      const sharp = require('sharp')
+      buffer = await sharp(buffer, { failOn: 'none' })
+        .rotate() // honour EXIF orientation
+        .resize({ width: 512, height: 512, fit: 'cover', position: 'centre' })
+        .jpeg({ quality: 85, mozjpeg: true })
+        .toBuffer()
+    } catch (err) {
+      winston.warn('Profile image resize failed: ' + err.message)
+      return apiUtil.sendApiError(res, 400, 'Invalid image')
+    }
+
+    try {
+      const fs = require('fs-extra')
+      const savePath = path.join(__dirname, '../../../../public/uploads/users')
+      fs.ensureDirSync(savePath)
+
+      const newName = 'aProfile_' + user._id + '_' + new Chance().hash({ length: 8 }) + '.jpg'
+      fs.writeFileSync(path.join(savePath, newName), buffer)
+
+      const dbUser = await User.findOne({ _id: user._id })
+      if (!dbUser) return apiUtil.sendApiError(res, 404, 'Invalid User Account')
+
+      const oldImage = dbUser.image
+      dbUser.image = newName
+      await dbUser.save()
+
+      // Best-effort cleanup of the previous self-uploaded avatar.
+      if (oldImage && oldImage !== newName && oldImage.indexOf('aProfile_') === 0) {
+        try { fs.removeSync(path.join(savePath, oldImage)) } catch (_e) {}
+      }
+
+      try {
+        const emitter = require('../../../emitter')
+        emitter.emit('trudesk:profileImageUpdate', { userid: dbUser._id, img: newName })
+      } catch (_e) {}
+
+      return apiUtil.sendApiSuccess(res, { image: newName, user: dbUser })
+    } catch (err) {
+      return apiUtil.sendApiError(res, 500, err.message)
+    }
+  })
+
+  req.pipe(busboy)
+}
+
 accountsApi.generateMFA = async (req, res) => {
   const payload = req.body
   const user = req.user
