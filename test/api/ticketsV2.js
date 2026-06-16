@@ -55,6 +55,10 @@ describe('api/v2/tickets + users (R3.3)', function () {
     if (!group.isMember(user._id)) {
       await group.addMember(user._id)
     }
+    // NOTE: the global test bootstrap (test/0_database.js) already wires this
+    // admin into a team -> department -> TEST-group chain, so the stats
+    // endpoints below (which scope to the caller's department groups, the same
+    // Jugend/Stab gate the ticket list uses) can see the fixture group.
 
     const type = await tickettype.getTypeByName('Task')
     let priority = await prioritySchema.findOne({ default: true })
@@ -242,6 +246,24 @@ describe('api/v2/tickets + users (R3.3)', function () {
       expect(res.body.ticketCount).to.equal(0)
       expect(res.body.closedCount).to.equal(0)
       expect(res.body.avgResponse).to.equal(0)
+    })
+
+    it('returns a group-scoped workload array', async function () {
+      const res = await get('/api/v2/tickets/stats/workload')
+      expect(res.status).to.equal(200)
+      expect(res.body.success).to.be.true
+      expect(res.body.workload).to.be.a('array')
+      // Fixture ticket is unassigned, so no assignee rows are produced.
+      expect(res.body.workload).to.have.lengthOf(0)
+    })
+
+    it('forbids group stats for a group the caller cannot see', async function () {
+      // A group id the fixture user is not a member of (and which is not in
+      // any of their departments) must be rejected before any data is read.
+      const mongoose = require('mongoose')
+      const unseenGroupId = new mongoose.Types.ObjectId().toString()
+      const res = await get('/api/v2/tickets/stats/group/' + unseenGroupId)
+      expect(res.status).to.equal(403)
     })
   })
 

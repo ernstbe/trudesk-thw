@@ -134,15 +134,7 @@ ticketsV2.get = async (req, res) => {
   }
 
   try {
-    let groups = []
-    if (req.user.role.isAdmin || req.user.role.isAgent) {
-      const dbGroups = await Models.Department.getDepartmentGroupsOfUser(req.user._id)
-      groups = dbGroups.map(g => g._id)
-    } else {
-      groups = await Models.Group.getAllGroupsOfUser(req.user._id)
-    }
-
-    const mappedGroups = groups.map(g => g._id)
+    const mappedGroups = await resolveVisibleGroups(req.user)
 
     const statuses = await ticketStatusSchema.find({ isResolved: false })
 
@@ -857,13 +849,47 @@ ticketsV2.subscribe = async function (req, res) {
 }
 
 // -------------------------------------------------------------------
+// Group visibility — the single source of truth for "which groups may
+// this user see". MUST stay identical to the gate used by the ticket
+// list (ticketsV2.get) so the statistics page can never surface tickets
+// the user could not open: Jugend never sees Stab and vice versa.
+// -------------------------------------------------------------------
+async function resolveVisibleGroups (user) {
+  let groups = []
+  if (user.role.isAdmin || user.role.isAgent) {
+    const dbGroups = await Models.Department.getDepartmentGroupsOfUser(user._id)
+    groups = dbGroups.map(g => g._id)
+  } else {
+    groups = await Models.Group.getAllGroupsOfUser(user._id)
+  }
+  return groups.map(g => g._id)
+}
+
+// Fetches every ticket the caller is allowed to see, applying the same
+// group gate AND the same owner restriction the ticket list uses for
+// users without the tickets:viewall permission.
+async function getVisibleTickets (req) {
+  const groups = await resolveVisibleGroups(req.user)
+  const queryObject = { limit: -1, page: 0 }
+  if (!permissions.canThis(req.user.role, 'tickets:viewall', false)) queryObject.owner = req.user._id
+  return Models.Ticket.getTicketsWithObject(groups, queryObject)
+}
+
+function toLocalDateKey (date) {
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return null
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// -------------------------------------------------------------------
 // Stats — GET /api/v2/tickets/stats(/:timespan)
-// Reads the same global cache keys the v1 endpoint uses.
+// Computed from the caller's group-visible tickets (NOT the global
+// org-wide cache), so the numbers match what the user can actually see.
 // -------------------------------------------------------------------
 ticketsV2.getStats = async function (req, res) {
-  const cache = global.cache
-  if (cache === undefined) return apiUtils.sendApiError(res, 503, 'Ticket stats are still loading')
-
   let timespan = 30
   if (req.params.timespan) {
     const parsed = parseInt(req.params.timespan, 10)
@@ -873,21 +899,85 @@ ticketsV2.getStats = async function (req, res) {
   const validSpans = new Set([30, 60, 90, 180, 365])
   if (!validSpans.has(timespan)) return apiUtils.sendApiError(res, 400, 'Invalid timespan (allowed: 30, 60, 90, 180, 365)')
 
-  const key = `tickets:overview:e${timespan}`
-  const data = {
-    timespan,
-    graphData: cache.get(`${key}:graphData`),
-    ticketCount: cache.get(`${key}:ticketCount`),
-    closedCount: cache.get(`${key}:closedTickets`),
-    ticketAvg: cache.get(`${key}:responseTime`),
-    mostRequester: cache.get('quickstats:mostRequester'),
-    mostCommenter: cache.get('quickstats:mostCommenter'),
-    mostAssignee: cache.get('quickstats:mostAssignee'),
-    mostActiveTicket: cache.get('quickstats:mostActiveTicket'),
-    lastUpdated: cache.get('tickets:overview:lastUpdated')
-  }
+  try {
+    const tickets = await getVisibleTickets(req)
 
-  return apiUtils.sendApiSuccess(res, data)
+    const windowStart = new Date()
+    windowStart.setHours(0, 0, 0, 0)
+    windowStart.setDate(windowStart.getDate() - (timespan - 1))
+
+    const inWindow = (tickets || []).filter(t => new Date(t.date) >= windowStart)
+
+    const byDay = new Map()
+    for (const t of inWindow) {
+      const key = toLocalDateKey(t.date)
+      if (!key) continue
+      byDay.set(key, (byDay.get(key) || 0) + 1)
+    }
+    const graphData = [...byDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, value]) => ({ date, value }))
+
+    const closedCount = inWindow.filter(t => isResolvedStatus(t.status)).length
+
+    return apiUtils.sendApiSuccess(res, {
+      timespan,
+      graphData,
+      ticketCount: inWindow.length,
+      closedCount,
+      ticketAvg: computeAvgResponseHours(inWindow),
+      lastUpdated: new Date()
+    })
+  } catch (err) {
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
+}
+
+// -------------------------------------------------------------------
+// Workload — GET /api/v2/tickets/stats/workload
+// Per-assignee breakdown computed from the caller's group-visible
+// tickets. Only assignees who appear on visible tickets are returned,
+// so a Jugend user never sees Stab agents or their counts.
+// -------------------------------------------------------------------
+ticketsV2.getWorkloadStats = async function (req, res) {
+  try {
+    const tickets = await getVisibleTickets(req)
+
+    const byAssignee = new Map()
+    for (const t of tickets || []) {
+      if (!t.assignee || !t.assignee._id) continue
+      const id = t.assignee._id.toString()
+      if (!byAssignee.has(id)) {
+        byAssignee.set(id, {
+          id,
+          name: t.assignee.fullname || t.assignee.username || 'Unknown',
+          ticketCount: 0,
+          closedCount: 0,
+          tickets: []
+        })
+      }
+      const row = byAssignee.get(id)
+      row.ticketCount += 1
+      if (isResolvedStatus(t.status)) row.closedCount += 1
+      row.tickets.push(t)
+    }
+
+    const workload = [...byAssignee.values()]
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        ticketCount: r.ticketCount,
+        closedCount: r.closedCount,
+        avgResponse: computeAvgResponseHours(r.tickets)
+      }))
+      .sort((a, b) => b.ticketCount - a.ticketCount)
+
+    return apiUtils.sendApiSuccess(res, { workload })
+  } catch (err) {
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message)
+  }
 }
 
 // -------------------------------------------------------------------
@@ -898,6 +988,11 @@ ticketsV2.getGroupStats = async function (req, res) {
   if (!groupId) return apiUtils.sendApiError(res, 400, 'Invalid Group Id')
 
   try {
+    const visible = await resolveVisibleGroups(req.user)
+    if (!visible.map(g => g.toString()).includes(groupId.toString())) {
+      return apiUtils.sendApiError(res, 403, 'Forbidden')
+    }
+
     const tickets = await Models.Ticket.getTicketsWithObject([groupId], { limit: 10000, page: 0 })
     if (!tickets || tickets.length === 0) return apiUtils.sendApiError(res, 404, 'Group has no tickets to report')
 
@@ -921,8 +1016,11 @@ ticketsV2.getUserStats = async function (req, res) {
   if (!userId) return apiUtils.sendApiError(res, 400, 'Invalid User Id')
 
   try {
-    const tickets = await Models.Ticket.getTicketsByRequester(userId)
-    if (!tickets || tickets.length === 0) return apiUtils.sendApiError(res, 404, 'User has no tickets to report')
+    const visible = (await resolveVisibleGroups(req.user)).map(g => g.toString())
+    const allTickets = await Models.Ticket.getTicketsByRequester(userId)
+    // Only count tickets in groups the caller is allowed to see.
+    const tickets = (allTickets || []).filter(t => t.group && visible.includes((t.group._id || t.group).toString()))
+    if (tickets.length === 0) return apiUtils.sendApiError(res, 404, 'User has no tickets to report')
 
     const closed = tickets.filter(t => isResolvedStatus(t.status))
     return apiUtils.sendApiSuccess(res, {
@@ -951,7 +1049,8 @@ ticketsV2.getAssigneeStats = async function (req, res) {
   if (!userId) return apiUtils.sendApiError(res, 400, 'Invalid User Id')
 
   try {
-    const tickets = await Models.Ticket.find({ assignee: userId, deleted: false })
+    const visible = await resolveVisibleGroups(req.user)
+    const tickets = await Models.Ticket.find({ assignee: userId, deleted: false, group: { $in: visible } })
       .populate('status')
       .lean()
       .exec()
