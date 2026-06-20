@@ -348,6 +348,72 @@ describe('api/v2/tickets + users (R3.3)', function () {
   })
 
   // ------------------------------------------------------------------
+  // Overdue — GET /api/v2/tickets/overdue
+  // Must be scoped to the caller's visible groups and must exclude
+  // tickets that are already in a resolved status.
+  // ------------------------------------------------------------------
+  describe('GET /api/v2/tickets/overdue', function () {
+    const cleanup = { tickets: [], groups: [] }
+
+    before(async function () {
+      const groupSchema = require('../../src/models/group')
+      const ticketSchema = require('../../src/models/ticket')
+      const tickettype = require('../../src/models/tickettype')
+      const prioritySchema = require('../../src/models/ticketpriority')
+      const statusSchema = require('../../src/models/ticketStatus')
+
+      const type = await tickettype.getTypeByName('Task')
+      let priority = await prioritySchema.findOne({ default: true })
+      if (!priority) priority = await prioritySchema.findOne({})
+      const openStatus = await statusSchema.findOne({ isResolved: false })
+      const resolvedStatus = await statusSchema.findOne({ isResolved: true })
+      const visibleGroup = await groupSchema.getGroupByName('TEST')
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+      const base = {
+        owner: adminUserId,
+        type: type._id,
+        priority: priority._id,
+        date: new Date(),
+        dueDate: yesterday
+      }
+
+      // 1) overdue + open + in a visible group → MUST appear
+      const visible = await ticketSchema.create({ ...base, group: visibleGroup._id, status: openStatus._id, subject: 'visible overdue', issue: 'x' })
+      cleanup.tickets.push(visible._id)
+
+      // 2) overdue + open + in a group the admin cannot see → MUST NOT appear
+      const fg = await groupSchema.create({ name: 'FOREIGN-OVERDUE-TEST' })
+      cleanup.groups.push(fg._id)
+      const foreign = await ticketSchema.create({ ...base, group: fg._id, status: openStatus._id, subject: 'foreign overdue', issue: 'x' })
+      cleanup.tickets.push(foreign._id)
+
+      // 3) overdue but already resolved, visible group → MUST NOT appear
+      if (resolvedStatus) {
+        const resolved = await ticketSchema.create({ ...base, group: visibleGroup._id, status: resolvedStatus._id, subject: 'resolved overdue', issue: 'x' })
+        cleanup.tickets.push(resolved._id)
+      }
+    })
+
+    after(async function () {
+      const groupSchema = require('../../src/models/group')
+      const ticketSchema = require('../../src/models/ticket')
+      for (const id of cleanup.tickets) await ticketSchema.deleteOne({ _id: id })
+      for (const id of cleanup.groups) await groupSchema.deleteOne({ _id: id })
+    })
+
+    it('returns only visible, unresolved overdue tickets', async function () {
+      const res = await get('/api/v2/tickets/overdue')
+      expect(res.status).to.equal(200)
+      expect(res.body.success).to.be.true
+      const subjects = res.body.tickets.map(t => t.subject)
+      expect(subjects).to.include('visible overdue')
+      expect(subjects).to.not.include('foreign overdue')
+      expect(subjects).to.not.include('resolved overdue')
+    })
+  })
+
+  // ------------------------------------------------------------------
   // Users / notifications (v2)
   // ------------------------------------------------------------------
   describe('GET /api/v2/users/notifications*', function () {
