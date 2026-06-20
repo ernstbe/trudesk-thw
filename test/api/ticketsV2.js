@@ -276,6 +276,78 @@ describe('api/v2/tickets + users (R3.3)', function () {
   })
 
   // ------------------------------------------------------------------
+  // Per-group access on the v2 write paths: a ticket in a group the
+  // caller cannot see must not be editable/deletable even though the
+  // caller holds the generic tickets:update / tickets:delete grant.
+  // ------------------------------------------------------------------
+  describe('group access on write paths', function () {
+    let foreignUid
+    let foreignId
+    let foreignGroupId
+
+    before(async function () {
+      const groupSchema = require('../../src/models/group')
+      const ticketSchema = require('../../src/models/ticket')
+      const tickettype = require('../../src/models/tickettype')
+      const prioritySchema = require('../../src/models/ticketpriority')
+      const statusSchema = require('../../src/models/ticketStatus')
+
+      // A brand-new group the fixture admin is NOT wired into via any team/department.
+      const fg = await groupSchema.create({ name: 'FOREIGN-WRITE-TEST' })
+      foreignGroupId = fg._id
+
+      const type = await tickettype.getTypeByName('Task')
+      let priority = await prioritySchema.findOne({ default: true })
+      if (!priority) priority = await prioritySchema.findOne({})
+      const status = await statusSchema.findOne({})
+
+      const t = await ticketSchema.create({
+        owner: adminUserId,
+        group: foreignGroupId,
+        status: status._id,
+        type: type._id,
+        priority: priority._id,
+        subject: 'foreign ticket',
+        issue: 'in a group the admin cannot see',
+        date: new Date()
+      })
+      foreignUid = t.uid
+      foreignId = t._id
+    })
+
+    after(async function () {
+      // Restore DB state so global counts (e.g. the group model tests) are unaffected.
+      const groupSchema = require('../../src/models/group')
+      const ticketSchema = require('../../src/models/ticket')
+      if (foreignId) await ticketSchema.deleteOne({ _id: foreignId })
+      if (foreignGroupId) await groupSchema.deleteOne({ _id: foreignGroupId })
+    })
+
+    it('rejects PUT update of a ticket in a non-visible group (403)', async function () {
+      const res = await put('/api/v2/tickets/' + foreignUid, { ticket: { subject: 'hijacked' } })
+      expect(res.status).to.equal(403)
+    })
+
+    it('rejects DELETE of a ticket in a non-visible group (403)', async function () {
+      const res = await del('/api/v2/tickets/' + foreignUid)
+      expect(res.status).to.equal(403)
+    })
+
+    it('reports failure for batch update of a non-visible ticket', async function () {
+      const res = await put('/api/v2/tickets/batch', { batch: [{ id: foreignId.toString(), status: 1 }] })
+      expect(res.status).to.equal(200)
+      expect(res.body.failed).to.equal(1)
+    })
+
+    it('reports failure for batch delete of a non-visible ticket', async function () {
+      const res = await del('/api/v2/tickets/batch', { ids: [foreignId.toString()] })
+      expect(res.status).to.equal(200)
+      expect(res.body.failed).to.equal(1)
+      expect(res.body.deleted).to.equal(0)
+    })
+  })
+
+  // ------------------------------------------------------------------
   // Users / notifications (v2)
   // ------------------------------------------------------------------
   describe('GET /api/v2/users/notifications*', function () {
