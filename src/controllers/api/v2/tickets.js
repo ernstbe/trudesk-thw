@@ -519,7 +519,23 @@ ticketsV2.deadline = async function (req, res) {
 
 ticketsV2.overdue = async function (req, res) {
   try {
-    const tickets = await Models.Ticket.find({ deleted: false, dueDate: { $lt: new Date() } })
+    // Scope to the caller's visible groups (same Jugend/Stab gate as the
+    // ticket list) and drop tickets in a resolved status — a ticket that
+    // was closed after its due date is done, not overdue.
+    const visibleGroups = await resolveVisibleGroups(req.user)
+    const resolvedStatuses = await ticketStatusSchema.find({ isResolved: true }).select('_id').lean()
+    const resolvedStatusIds = resolvedStatuses.map(s => s._id)
+
+    const query = {
+      deleted: false,
+      dueDate: { $lt: new Date() },
+      group: { $in: visibleGroups },
+      status: { $nin: resolvedStatusIds }
+    }
+    // Mirror the list: users without tickets:viewall only see their own.
+    if (!permissions.canThis(req.user.role, 'tickets:viewall', false)) query.owner = req.user._id
+
+    const tickets = await Models.Ticket.find(query)
       .populate('owner assignee', 'username fullname email role image title')
       .populate('type tags status group')
       .sort({ dueDate: 1 })
