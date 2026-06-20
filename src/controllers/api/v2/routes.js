@@ -198,8 +198,8 @@ module.exports = function (middleware, router, controllers) {
   // under apiv2Auth so it works with Bearer JWTs and the v1-accesstoken
   // fallback — no session cookie / CSRF token needed (unlike the legacy
   // /tickets/uploadattachment route).
-  router.post('/api/v2/tickets/:tid/attachments', apiv2Auth, apiv1.tickets.uploadAttachment)
-  router.delete('/api/v2/tickets/:tid/attachments/remove/:aid', apiv2Auth, apiv1.tickets.removeAttachment)
+  router.post('/api/v2/tickets/:tid/attachments', apiv2Auth, canUser('tickets:update'), apiv1.tickets.uploadAttachment)
+  router.delete('/api/v2/tickets/:tid/attachments/remove/:aid', apiv2Auth, canUser('tickets:update'), apiv1.tickets.removeAttachment)
 
   // Notifications — v1 bolted these onto /users/notifications because of
   // legacy controller layout. v2 gets a cleaner /notifications root.

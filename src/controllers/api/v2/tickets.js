@@ -246,6 +246,11 @@ ticketsV2.update = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    // The route grants the generic tickets:update permission; this restricts
+    // it to tickets in the caller's own groups (in-place edits aren't covered
+    // by the helper's group-move gate). Mirrors the read gate in .single.
+    await assertTicketGroupVisible(req.user, ticket)
+
     const { applyTicketUpdate } = require('../ticketUpdateHelper')
     await applyTicketUpdate(ticket, putTicket, req.user)
 
@@ -278,9 +283,16 @@ ticketsV2.batchUpdate = async function (req, res) {
 
   const results = { success: 0, failed: 0, errors: [] }
 
+  // Resolve the caller's visible groups once and gate every ticket in the
+  // batch against it, so a batch update can't reach tickets the user could
+  // not open individually (same Jugend/Stab boundary as .single / .update).
+  const visibleGroups = (await resolveVisibleGroups(req.user)).map(g => g.toString())
+
   await Promise.allSettled(batch.map(async (batchTicket) => {
     try {
       const ticket = await Models.Ticket.getTicketById(batchTicket.id)
+      if (!ticket) throw new Error('Ticket not found')
+      await assertTicketGroupVisible(req.user, ticket, visibleGroups)
 
       if (batchTicket.status !== undefined) {
         await ticket.setStatus(req.user._id, batchTicket.status)
@@ -330,6 +342,8 @@ ticketsV2.updateMetadata = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    await assertTicketGroupVisible(req.user, ticket)
+
     if (!ticket.metadata) ticket.metadata = {}
 
     for (let i = 0; i < allowedFields.length; i++) {
@@ -353,6 +367,7 @@ ticketsV2.updateMetadata = async function (req, res) {
 
     return apiUtils.sendApiSuccess(res, { ticket })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     return apiUtils.sendApiError(res, 500, err.message)
   }
 }
@@ -362,11 +377,17 @@ ticketsV2.delete = async function (req, res) {
   if (!uid) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
 
   try {
+    const ticket = await Models.Ticket.getTicketByUid(uid)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    await assertTicketGroupVisible(req.user, ticket)
+
     const success = await Models.Ticket.softDeleteUid(uid)
     if (!success) return apiUtils.sendApiError(res, 500, 'Unable to delete ticket')
 
     return apiUtils.sendApiSuccess(res, { deleted: true })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     return apiUtils.sendApiError(res, 500, err.message)
   }
 }
@@ -393,7 +414,15 @@ ticketsV2.transferToThirdParty = async (req, res) => {
     const ticket = await Models.Ticket.findOne({ uid })
     if (!ticket) return apiUtils.sendApiError(res, 400, 'Ticket not found')
 
-    ticket.status = 3
+    // Close the ticket via the resolved status flag rather than a hardcoded
+    // numeric 3 — with custom statuses, 3 may not be a resolved status and
+    // bypassing setStatus would skip the closedDate bookkeeping.
+    const resolvedStatus = await ticketStatusSchema.findOne({ isResolved: true }).sort('order')
+    if (resolvedStatus) {
+      await ticket.setStatus(req.user._id, resolvedStatus._id)
+    } else {
+      ticket.status = 3
+    }
     await ticket.save()
 
     const request = require('axios')
@@ -872,6 +901,24 @@ async function resolveVisibleGroups (user) {
   return groups.map(g => g._id)
 }
 
+// Throws a 403-tagged error if the ticket's group is not visible to the
+// user — the same gate the single-ticket read (ticketsV2.single) applies.
+// The v2 write paths fetch a ticket by id/uid before mutating it; without
+// this guard a user holding the generic tickets:update / tickets:delete
+// grant could modify or delete a ticket in a group they cannot see (e.g.
+// Jugend touching Stab tickets). Pass `preResolved` (a string[] of group
+// ids) to reuse one lookup across a batch. Returns the resolved id list.
+async function assertTicketGroupVisible (user, ticket, preResolved) {
+  const visible = preResolved || (await resolveVisibleGroups(user)).map(g => g.toString())
+  const gid = ticket && ticket.group ? (ticket.group._id || ticket.group).toString() : null
+  if (!gid || !visible.includes(gid)) {
+    const err = new Error('Forbidden')
+    err.statusCode = 403
+    throw err
+  }
+  return visible
+}
+
 // Fetches every ticket the caller is allowed to see, applying the same
 // group gate AND the same owner restriction the ticket list uses for
 // users without the tickets:viewall permission.
@@ -1111,10 +1158,13 @@ ticketsV2.batchDelete = async function (req, res) {
   // already sets { success: true } at the top level and would collide.
   const results = { deleted: 0, failed: 0, errors: [] }
 
+  const visibleGroups = (await resolveVisibleGroups(req.user)).map(g => g.toString())
+
   await Promise.allSettled(ids.map(async (id) => {
     try {
       const ticket = await Models.Ticket.getTicketById(id)
       if (!ticket) throw new Error('Ticket not found')
+      await assertTicketGroupVisible(req.user, ticket, visibleGroups)
       ticket.deleted = true
       ticket.updated = new Date()
       ticket.history.push({
