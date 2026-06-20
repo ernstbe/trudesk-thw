@@ -148,6 +148,14 @@ describe('api/v2/tickets + users (R3.3)', function () {
       expect(res.body.ticket.comments.length).to.be.at.least(1)
     })
 
+    it('preserves blank lines between paragraphs', async function () {
+      const res = await post('/api/v2/tickets/' + ticketUid + '/comments', { comment: 'line one\n\n\nline two' })
+      expect(res.status).to.equal(200)
+      const added = res.body.ticket.comments[res.body.ticket.comments.length - 1]
+      // Newlines become <br> so marked cannot collapse the blank lines away.
+      expect(added.comment).to.match(/line one(<br\s*\/?>\s*){3}line two/)
+    })
+
     it('rejects a request without a comment body', async function () {
       const res = await post('/api/v2/tickets/' + ticketUid + '/comments', {})
       expect(res.status).to.equal(400)

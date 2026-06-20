@@ -746,7 +746,12 @@ ticketsV2.postComment = async function (req, res) {
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
     marked.setOptions({ breaks: true })
-    const comment = sanitizeHtml(body.comment).trim()
+    // Preserve user line breaks AND blank lines: convert newlines to <br>
+    // before marked.parse, otherwise marked collapses any run of blank
+    // lines into a single paragraph break. Same pattern as issue create
+    // and the v1 postComment fix (trudesk-thw #113).
+    let comment = body.comment.replace(/(\r\n|\n\r|\r|\n)/g, '<br>')
+    comment = sanitizeHtml(comment).trim()
 
     const commentDoc = {
       owner: req.user._id,
@@ -787,7 +792,9 @@ ticketsV2.postNote = async function (req, res) {
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
     marked.setOptions({ breaks: true })
-    const note = sanitizeHtml(body.note).trim()
+    // See postComment: protect blank lines from marked's paragraph collapse.
+    let note = body.note.replace(/(\r\n|\n\r|\r|\n)/g, '<br>')
+    note = sanitizeHtml(note).trim()
 
     const noteDoc = {
       owner: req.user._id,
