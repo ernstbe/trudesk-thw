@@ -117,9 +117,11 @@ describe('api/v2/tickets review follow-ups', function () {
       batch: [{ id: ticketId.toString(), status: closed._id.toString() }]
     })
     expect(res.status).to.equal(200)
-    // NB: batchUpdate merges its result counters onto the { success: true }
-    // envelope, so the numeric success/failed counts land at the top level.
-    expect(res.body.success).to.equal(1)
+    // batchUpdate merges its counters onto the { success: true } envelope, so
+    // the per-ticket counts use `updated`/`failed` (not `success`) to avoid
+    // clobbering the boolean success flag.
+    expect(res.body.success).to.be.true
+    expect(res.body.updated).to.equal(1)
     expect(res.body.failed).to.equal(0)
 
     const fresh = await freshTicket()
@@ -135,7 +137,8 @@ describe('api/v2/tickets review follow-ups', function () {
       batch: [{ id: ticketId.toString(), status: open._id.toString() }]
     })
     expect(res.status).to.equal(200)
-    expect(res.body.success).to.equal(1)
+    expect(res.body.success).to.be.true
+    expect(res.body.updated).to.equal(1)
     expect(res.body.failed).to.equal(0)
 
     const fresh = await freshTicket()
