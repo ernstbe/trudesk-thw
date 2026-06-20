@@ -281,7 +281,11 @@ ticketsV2.batchUpdate = async function (req, res) {
   const batch = req.body.batch
   if (!Array.isArray(batch)) return apiUtils.sendApiError_InvalidPostData(res)
 
-  const results = { success: 0, failed: 0, errors: [] }
+  // NB: don't use `success` as the inner counter key — apiUtils.sendApiSuccess
+  // sets { success: true } at the top level and Object.assign would clobber it
+  // with the number, so clients can no longer read the boolean success flag.
+  // Use `updated` (mirrors batchDelete's `deleted`).
+  const results = { updated: 0, failed: 0, errors: [] }
 
   // Resolve the caller's visible groups once and gate every ticket in the
   // batch against it, so a batch update can't reach tickets the user could
@@ -321,7 +325,7 @@ ticketsV2.batchUpdate = async function (req, res) {
       }
 
       await ticket.save()
-      results.success++
+      results.updated++
     } catch (err) {
       results.failed++
       results.errors.push({ id: batchTicket.id, error: err.message })
