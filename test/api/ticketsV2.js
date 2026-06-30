@@ -482,11 +482,26 @@ describe('api/v2/tickets + users (R3.3)', function () {
       expect(res.body.attachment).to.be.a('object')
       // sharp converts to JPEG, so the stored attachment must reflect that.
       expect(res.body.attachment.type).to.equal('image/jpeg')
-      expect(res.body.attachment.name).to.match(/\.jpg$/)
+      // The original base name is preserved (only the extension follows the
+      // re-encode), so the user sees "pixel.jpg" — not a random hash.
+      expect(res.body.attachment.name).to.equal('pixel.jpg')
       // size is set on the stored buffer length so clients can render
       // a "324 KB" badge without a second HEAD request.
       expect(res.body.attachment.size).to.be.a('number').and.greaterThan(0)
       expect(res.body.ticket.attachments.length).to.be.at.least(1)
+    })
+
+    it('keeps the original filename for a non-image upload (PDF)', async function () {
+      const res = await uploadAttachment(
+        '/api/v2/tickets/' + ticketId + '/attachments',
+        Buffer.from('%PDF-1.4 fake pdf body'),
+        'Mein Bericht.pdf',
+        'application/pdf'
+      )
+      expect(res.status).to.equal(200)
+      expect(res.body.attachment.name).to.equal('Mein Bericht.pdf')
+      // The on-disk path still uses an opaque hash, not the original name.
+      expect(res.body.attachment.path).to.match(/attachment_[a-f0-9]{16}\.pdf$/)
     })
 
     it('returns 404 for an unknown ticket id', async function () {

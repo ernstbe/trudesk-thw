@@ -1952,6 +1952,23 @@ const ATTACHMENT_ALLOWED_EXTS = new Set([
  * @apiError InvalidFileType       Mime/extension not in allow-list
  * @apiError FileTooLarge          Pre-resize size exceeds 25 MB
  */
+// Builds the user-facing attachment name: keep the original base name (so the
+// download is recognisable) but drop any directory parts / unsafe characters,
+// and use the final extension (which may differ from the upload when an image
+// was re-encoded to JPEG). The on-disk filename stays a random hash — only this
+// display `name` carries the original.
+function buildAttachmentDisplayName (originalName, finalExt) {
+  const path = require('path')
+  let base = path.basename(originalName || '', path.extname(originalName || ''))
+  // Strip control chars and characters that are illegal in filenames / risky in
+  // a display context. `name` is rendered as text in the clients, never used to
+  // build a filesystem path (that's the hashed storedName), so this is belt-and-braces.
+  base = base.replace(/[<>:"/\\|?*]/g, '').trim()
+  if (!base) base = 'attachment'
+  if (base.length > 120) base = base.slice(0, 120)
+  return base + finalExt
+}
+
 apiTickets.uploadAttachment = function (req, res) {
   const ticketId = req.params.tid
   if (!ticketId) return res.status(400).json({ success: false, error: 'Invalid Ticket Id' })
@@ -1983,6 +2000,7 @@ apiTickets.uploadAttachment = function (req, res) {
   let error = null
   let uploadedMime = null
   let uploadedExt = null
+  let uploadedName = ''
   const chunks = []
   let truncated = false
 
@@ -2000,6 +2018,7 @@ apiTickets.uploadAttachment = function (req, res) {
 
     uploadedMime = mimetype
     uploadedExt = ext
+    uploadedName = filename
 
     file.on('limit', function () {
       truncated = true
@@ -2063,16 +2082,21 @@ apiTickets.uploadAttachment = function (req, res) {
       const filePath = path.join(savePath, 'attachment_' + storedName)
       fs.writeFileSync(filePath, buffer)
 
+      // The file is stored on disk under the random `storedName` (uniqueness +
+      // no path-traversal risk), but the attachment's display `name` keeps the
+      // user's original filename so it stays recognisable in the clients.
+      const displayName = buildAttachmentDisplayName(uploadedName, finalExt)
+
       ticket.attachments.push({
         owner: user._id,
-        name: storedName,
+        name: displayName,
         path: '/uploads/tickets/' + ticketId + '/attachment_' + storedName,
         type: finalMime,
         size: buffer.length
       })
       ticket.history.push({
         action: 'ticket:added:attachment',
-        description: 'Attachment ' + storedName + ' was added.',
+        description: 'Attachment ' + displayName + ' was added.',
         owner: user._id
       })
       ticket.updated = Date.now()
