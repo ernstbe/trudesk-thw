@@ -4,6 +4,22 @@ const Chance = require('chance')
 const Document = require('../../../models/document')
 const apiUtil = require('../apiUtils')
 
+const UPLOADS_DIR = path.join(__dirname, '../../../../public/uploads/documents')
+
+// Resolve a stored filename to an absolute path that is guaranteed to live
+// INSIDE the documents uploads directory. Returns null when the (basename-
+// reduced) filename would still escape the directory — the caller then
+// treats it as not-found/invalid rather than reading an arbitrary file.
+function resolveUploadPath (filename) {
+  if (!filename || typeof filename !== 'string') return null
+  const safeName = path.basename(filename)
+  const resolved = path.resolve(UPLOADS_DIR, safeName)
+  // Final containment guard: reject anything (e.g. a bare "..") that resolves
+  // outside the uploads directory even after the basename reduction.
+  if (!resolved.startsWith(path.resolve(UPLOADS_DIR) + path.sep)) return null
+  return resolved
+}
+
 const documentsApi = {}
 
 documentsApi.get = async function (req, res) {
@@ -40,7 +56,10 @@ documentsApi.create = async function (req, res) {
       const doc = await Document.create({
         name: postData.name,
         description: postData.description,
-        filename: postData.filename || 'placeholder.dat',
+        // JSON create is metadata-only (no file is uploaded here), so never
+        // trust a client-supplied filename that would later be joined onto the
+        // uploads dir for download/delete. Reduce to a bare basename.
+        filename: postData.filename ? path.basename(postData.filename) : 'placeholder.dat',
         originalFilename: postData.originalFilename || postData.name,
         mimetype: postData.mimetype || 'application/octet-stream',
         size: postData.size || 0,
@@ -192,8 +211,8 @@ documentsApi.delete = async function (req, res) {
 
     // Remove file from disk if it exists
     if (doc.filename && doc.filename !== 'placeholder.dat') {
-      const filePath = path.join(__dirname, '../../../../public/uploads/documents', doc.filename)
-      if (fs.existsSync(filePath)) {
+      const filePath = resolveUploadPath(doc.filename)
+      if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath)
       }
     }
@@ -213,7 +232,10 @@ documentsApi.download = async function (req, res) {
     const doc = await Document.findById(id)
     if (!doc) return apiUtil.sendApiError(res, 404, 'Document not found')
 
-    const filePath = path.join(__dirname, '../../../../public/uploads/documents', doc.filename)
+    const filePath = resolveUploadPath(doc.filename)
+    if (!filePath) {
+      return apiUtil.sendApiError(res, 400, 'Invalid document path')
+    }
     if (!fs.existsSync(filePath)) {
       return apiUtil.sendApiError(res, 404, 'File not found on disk')
     }
