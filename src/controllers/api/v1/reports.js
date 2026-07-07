@@ -12,7 +12,6 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-const async = require('async')
 const ticketSchema = require('../../../models/ticket')
 const groupSchema = require('../../../models/group')
 const csv = require('csv')
@@ -20,6 +19,19 @@ const dayjs = require('../../../helpers/dayjs')
 
 const apiReports = {
   generate: {}
+}
+
+// Resolve the group set for a report. When the client passes the sentinel
+// 'all', expand it to every group the caller may report on (admins/agents →
+// all groups, everyone else → their own); otherwise use the explicit list.
+// The group models are async statics — the previous code fed them node
+// callbacks that Mongoose 8 drops, so 'all' reports silently hung.
+async function resolveReportGroups (req, postData) {
+  if (!postData.groups || !postData.groups.includes('all')) return postData.groups
+  if (req.user.role.isAdmin || req.user.role.isAgent) {
+    return groupSchema.getAllGroupsNoPopulate()
+  }
+  return groupSchema.getAllGroupsOfUser(req.user._id)
 }
 
 /**
@@ -52,13 +64,12 @@ const apiReports = {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByGroup = function (req, res) {
+apiReports.generate.ticketsByGroup = async function (req, res) {
   const postData = req.body
   if (!postData || !postData.startDate || !postData.endDate) { return res.status(400).json({ success: false, error: 'Invalid Post Data' }) }
 
-  ticketSchema.getTicketsWithObject(
-    postData.groups,
-    {
+  try {
+    const tickets = await ticketSchema.getTicketsWithObject(postData.groups, {
       limit: -1,
       page: 0,
       filter: {
@@ -67,50 +78,39 @@ apiReports.generate.ticketsByGroup = function (req, res) {
           end: postData.endDate
         }
       }
-    },
-    function (err, tickets) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      const input = processReportData(tickets)
-
-      tickets = null
-
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
-apiReports.generate.ticketsByTeam = function (req, res) {
+apiReports.generate.ticketsByTeam = async function (req, res) {
   const postData = req.body
   if (!postData || !postData.startDate || !postData.endDate) { return res.status(400).json({ success: false, error: 'Invalid Post Data' }) }
 
   const departmentSchema = require('../../../models/department')
-  departmentSchema.getDepartmentsByTeam(postData.teams, function (err, departments) {
-    if (err) return res.status(500).json({ success: false, error: err.message })
+  try {
+    const departments = await departmentSchema.getDepartmentsByTeam(postData.teams)
 
-    ticketSchema.getTicketsByDepartments(
-      departments,
-      {
-        limit: -1,
-        page: 0,
-        filter: {
-          date: {
-            start: postData.startDate,
-            end: postData.endDate
-          }
+    const tickets = await ticketSchema.getTicketsByDepartments(departments, {
+      limit: -1,
+      page: 0,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
         }
-      },
-      function (err, tickets) {
-        if (err) return res.status(500).json({ success: false, error: err.message })
-
-        const input = processReportData(tickets)
-
-        tickets = null
-
-        return processResponse(res, input)
       }
-    )
-  })
+    })
+
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message })
+  }
 }
 
 /**
@@ -144,58 +144,24 @@ apiReports.generate.ticketsByTeam = function (req, res) {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByPriority = function (req, res) {
+apiReports.generate.ticketsByPriority = async function (req, res) {
   const postData = req.body
 
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
-        }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            filter: {
-              priority: postData.priorities
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      filter: {
+        priority: postData.priorities
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
 /**
@@ -229,62 +195,28 @@ apiReports.generate.ticketsByPriority = function (req, res) {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByStatus = function (req, res) {
+apiReports.generate.ticketsByStatus = async function (req, res) {
   const postData = req.body
 
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      status: postData.status,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
         }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            status: postData.status,
-            filter: {
-              date: {
-                start: postData.startDate,
-                end: postData.endDate
-              }
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
 /**
@@ -318,62 +250,28 @@ apiReports.generate.ticketsByStatus = function (req, res) {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByTags = function (req, res) {
+apiReports.generate.ticketsByTags = async function (req, res) {
   const postData = req.body
 
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
-        }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            filter: {
-              date: {
-                start: postData.startDate,
-                end: postData.endDate
-              },
-              tags: postData.tags
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
+        },
+        tags: postData.tags
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
 /**
@@ -407,61 +305,28 @@ apiReports.generate.ticketsByTags = function (req, res) {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByType = function (req, res) {
+apiReports.generate.ticketsByType = async function (req, res) {
   const postData = req.body
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
 
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
-        }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            filter: {
-              date: {
-                start: postData.startDate,
-                end: postData.endDate
-              },
-              types: postData.types
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
+        },
+        types: postData.types
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
 /**
@@ -495,118 +360,52 @@ apiReports.generate.ticketsByType = function (req, res) {
      "error": "Invalid Post Data"
  }
  */
-apiReports.generate.ticketsByUser = function (req, res) {
+apiReports.generate.ticketsByUser = async function (req, res) {
   const postData = req.body
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
 
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
-        }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            filter: {
-              date: {
-                start: postData.startDate,
-                end: postData.endDate
-              },
-              owner: postData.users
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
+        },
+        owner: postData.users
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
-apiReports.generate.ticketsByAssignee = function (req, res) {
+apiReports.generate.ticketsByAssignee = async function (req, res) {
   const postData = req.body
-  async.waterfall(
-    [
-      function (done) {
-        if (postData.groups.includes('all')) {
-          if (req.user.role.isAdmin || req.user.role.isAgent) {
-            groupSchema.getAllGroupsNoPopulate(function (err, grps) {
-              if (err) return done(err)
 
-              return done(null, grps)
-            })
-          } else {
-            groupSchema.getAllGroupsOfUser(req.user._id, function (err, grps) {
-              if (err) return done(err)
-
-              return done(null, grps)
-            })
-          }
-        } else {
-          return done(null, postData.groups)
-        }
-      },
-      function (grps, done) {
-        ticketSchema.getTicketsWithObject(
-          grps,
-          {
-            limit: -1,
-            page: 0,
-            filter: {
-              date: {
-                start: postData.startDate,
-                end: postData.endDate
-              },
-              assignee: postData.assignee
-            }
-          },
-          function (err, tickets) {
-            if (err) return done(err)
-
-            const input = processReportData(tickets)
-
-            tickets = null
-
-            return done(null, input)
-          }
-        )
+  try {
+    const grps = await resolveReportGroups(req, postData)
+    const tickets = await ticketSchema.getTicketsWithObject(grps, {
+      limit: -1,
+      page: 0,
+      filter: {
+        date: {
+          start: postData.startDate,
+          end: postData.endDate
+        },
+        assignee: postData.assignee
       }
-    ],
-    function (err, input) {
-      if (err) return res.status(400).json({ success: false, error: err })
+    })
 
-      return processResponse(res, input)
-    }
-  )
+    const input = processReportData(tickets)
+    return processResponse(res, input)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || err })
+  }
 }
 
 function processReportData (tickets) {

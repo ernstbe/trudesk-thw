@@ -210,8 +210,13 @@ events.onImportJSON = function (socket) {
         existingUser.fullname = uu.fullname
         existingUser.title = uu.title
         existingUser.email = uu.email
-        if (uu.role !== undefined) {
-          existingUser.role = uu.role
+        if (uu.role !== undefined && uu.role !== null && uu.role !== '') {
+          // Role is an ObjectId ref — resolve the supplied name against the
+          // roles collection instead of assigning the raw string (CastError,
+          // same bug the ADD branch above already fixes).
+          const role = await Role.findOne({ normalized: String(uu.role).toLowerCase() })
+          if (!role) throw new Error('Invalid Role: ' + String(uu.role).toLowerCase())
+          existingUser.role = role._id
         }
 
         await existingUser.save()

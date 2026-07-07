@@ -788,7 +788,9 @@ function buildQueryWithObject (SELF, grpId, object, count) {
   }
 
   let query
-  if (count) query = SELF.model(COLLECTION).countDocuments({ groups: { $in: grpId }, deleted: false })
+  // Schema field is `group` (singular). The old `groups` never matched, so
+  // getCountWithObject / v2 totalCount always returned 0.
+  if (count) query = SELF.model(COLLECTION).countDocuments({ group: { $in: grpId }, deleted: false })
   else {
     query = SELF.model(COLLECTION)
       .find({ group: { $in: grpId }, deleted: false })

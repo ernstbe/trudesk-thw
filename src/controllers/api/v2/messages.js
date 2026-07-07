@@ -108,7 +108,36 @@ apiMessages.single = async (req, res) => {
 }
 
 apiMessages.deleteConversation = async (req, res) => {
-  return apiUtils.sendApiSuccess(res)
+  const _id = req.params.id
+  if (!_id) return apiUtils.sendApiError(res, 400, 'Invalid Conversation Id')
+
+  try {
+    const conversation = await Conversation.getConversation(_id)
+    if (!conversation) return apiUtils.sendApiError(res, 404, 'Conversation not found')
+
+    const isParticipant = conversation.participants.some(
+      p => (p._id || p).toString() === req.user._id.toString()
+    )
+    if (!isParticipant) return apiUtils.sendApiError(res, 403, 'Forbidden')
+
+    // Per-user soft delete: stamp deletedAt on THIS user's userMeta entry.
+    // getConversations already hides a conversation whose deletedAt is newer
+    // than the last activity (updatedAt), so this removes it from the caller's
+    // list until a newer message arrives, without destroying it for the other
+    // participant. Matches how the chat client models "delete conversation".
+    const now = new Date()
+    const meta = conversation.userMeta.find(m => m.userId.toString() === req.user._id.toString())
+    if (meta) {
+      meta.deletedAt = now
+    } else {
+      conversation.userMeta.push({ userId: req.user._id, deletedAt: now })
+    }
+
+    await conversation.save()
+    return apiUtils.sendApiSuccess(res)
+  } catch (e) {
+    return apiUtils.sendApiError(res, 500, e.message)
+  }
 }
 
 module.exports = apiMessages
