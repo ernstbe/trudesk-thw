@@ -1,6 +1,7 @@
 const RecurringTask = require('../../../models/recurringTask')
 const Ticket = require('../../../models/ticket')
 const apiUtil = require('../apiUtils')
+const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
 
 const calendarApi = {}
 
@@ -36,10 +37,13 @@ calendarApi.getEvents = async function (req, res) {
       })
     }
 
-    // Tickets with dueDate in range
+    // Tickets with dueDate in range — scoped to the caller's visible groups
+    // so a Jugend agent never sees Stab ticket subjects on the calendar.
+    const visibleGroups = await resolveVisibleGroups(req.user)
     const tickets = await Ticket.find({
       deleted: false,
-      dueDate: { $gte: startDate, $lte: endDate }
+      dueDate: { $gte: startDate, $lte: endDate },
+      group: { $in: visibleGroups }
     })
       .populate('status priority')
       .exec()
