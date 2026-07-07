@@ -12,7 +12,9 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
+const winston = require('../logger')
 const utils = require('../helpers/utils')
+const permissions = require('../permissions')
 const sharedVars = require('./index').shared
 const socketEvents = require('./socketEventConsts')
 
@@ -23,8 +25,24 @@ function register (socket) {
   events.emitRestoreComplete(socket)
 }
 
+// These events stop the global event loop and mass-disconnect every client,
+// so they must be restricted to users who may actually run a restore. Without
+// this any authenticated client could emit BACKUP_RESTORE_SHOW_OVERLAY and
+// halt the server's event loop (DoS). Backup/restore is an admin-only settings
+// action (adminGrants includes 'settings:*'), so gate on 'settings:restore'.
+function mayRestore (socket) {
+  const user = socket.request && socket.request.user
+  if (!user || !permissions.canThis(user.role, 'settings:restore')) {
+    winston.warn('[backupRestoreSocket] - Rejected restore event: insufficient permissions.')
+    return false
+  }
+  return true
+}
+
 events.showRestoreOverlay = function (socket) {
   socket.on(socketEvents.BACKUP_RESTORE_SHOW_OVERLAY, function () {
+    if (!mayRestore(socket)) return
+
     if (global.socketServer && global.socketServer.eventLoop) {
       global.socketServer.eventLoop.stop()
     }
@@ -35,6 +53,8 @@ events.showRestoreOverlay = function (socket) {
 
 events.emitRestoreComplete = function (socket) {
   socket.on(socketEvents.BACKUP_RESTORE_COMPLETE, function () {
+    if (!mayRestore(socket)) return
+
     utils.sendToAllConnectedClients(io, socketEvents.BACKUP_RESTORE_UI_COMPLETE)
     utils.disconnectAllClients(io)
     sharedVars.sockets = []

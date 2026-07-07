@@ -99,7 +99,9 @@ module.exports.sendToAllExcept = function (io, exceptSocketId, method, data) {
 }
 
 module.exports.disconnectAllClients = function (io) {
-  Object.keys(io.sockets.sockets).forEach(function (sock) {
-    io.sockets.sockets[sock].disconnect(true)
+  // io.sockets.sockets is a Map in socket.io 4 — Object.keys() on it is always
+  // empty, so the old implementation disconnected nobody. Iterate the Map.
+  io.sockets.sockets.forEach(function (socket) {
+    socket.disconnect(true)
   })
 }

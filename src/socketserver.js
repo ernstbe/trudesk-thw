@@ -51,19 +51,31 @@ const socketServer = function (ws) {
           }
 
           const userSchema = require('./models/user')
-          userSchema.getUserByAccessToken(data.request._query.token, (err, user) => {
-            if (!err && user) {
-              winston.debug('Authenticated socket ' + data.id + ' - ' + user.username)
-              data.request.user = user
-              data.request.user.logged_in = true
-              data.token = data.request._query.token
-              return next(null, data)
-            }
+          // getUserByAccessToken is an async static (returns a Promise) — the
+          // legacy node-callback form was silently dropped, so next() never
+          // fired and token-authenticated clients (the PWA) hung forever on the
+          // handshake. Drive it via the promise instead.
+          userSchema
+            .getUserByAccessToken(data.request._query.token)
+            .then(user => {
+              if (user) {
+                winston.debug('Authenticated socket ' + data.id + ' - ' + user.username)
+                data.request.user = user
+                data.request.user.logged_in = true
+                data.token = data.request._query.token
+                return next(null, data)
+              }
 
-            data.emit('unauthorized')
-            data.disconnect('Unauthorized')
-            return next(new Error('Unauthorized'))
-          })
+              data.emit('unauthorized')
+              data.disconnect('Unauthorized')
+              return next(new Error('Unauthorized'))
+            })
+            .catch(err => {
+              winston.debug('Socket token auth failed: ' + (err && err.message ? err.message : err))
+              data.emit('unauthorized')
+              data.disconnect('Unauthorized')
+              return next(new Error('Unauthorized'))
+            })
         },
         function (data, accept) {
           if (data.request && data.request.user && data.request.user.logged_in) {
