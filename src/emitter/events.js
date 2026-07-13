@@ -198,6 +198,32 @@ const eventTicketCreated = require('./events/event_ticket_created')
         }
       }
 
+      // Notifications for additional assignees — same as the primary assignee,
+      // deduplicated against the owner, the primary assignee and the comment
+      // author (all handled above) so nobody gets two notifications.
+      if (Array.isArray(ticket.additionalAssignees) && ticket.additionalAssignees.length > 0) {
+        const alreadyNotifiedIds = new Set([comment.owner.toString(), ticket.owner._id.toString()])
+        if (ticket.assignee && ticket.assignee._id) alreadyNotifiedIds.add(ticket.assignee._id.toString())
+
+        for (const additional of ticket.additionalAssignees) {
+          if (!additional) continue
+          const additionalId = (additional._id || additional).toString()
+          if (alreadyNotifiedIds.has(additionalId)) continue
+          alreadyNotifiedIds.add(additionalId)
+
+          const notification = new NotificationSchema({
+            owner: additionalId,
+            title: 'Comment Added to Ticket#' + ticket.uid,
+            message: ticket.subject,
+            type: 2,
+            data: { ticket },
+            unread: true
+          })
+
+          notificationPromises.push(notification.save())
+        }
+      }
+
       // Mention notifications
       const commentText = comment.comment || ''
       const mentionedUsernames = parseMentions(commentText)

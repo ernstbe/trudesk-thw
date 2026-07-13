@@ -11,7 +11,6 @@
  *  Updated:    1/20/19 4:43 PM
  *  Copyright (c) 2014-2019. All rights reserved.
  */
-const async = require('async')
 const winston = require('../logger')
 const utils = require('../helpers/utils')
 const userSchema = require('../models/user')
@@ -178,66 +177,57 @@ events.updateOnlineBubbles = function (socket) {
 }
 
 async function updateConversationsNotifications (socket) {
-  if (socket && socket.request && socket.request.user) {
-    const user = socket.request.user
-    const Message = require('../models/chat/message')
-    const Conversation = require('../models/chat/conversation')
+  if (!socket || !socket.request || !socket.request.user) return
 
-    Conversation.getConversationsWithLimit(user._id, null, (err, conversations) => {
-      if (err) {
-        winston.warn(err.message)
-        return false
+  const user = socket.request.user
+  const Message = require('../models/chat/message')
+  const Conversation = require('../models/chat/conversation')
+
+  try {
+    // getConversationsWithLimit / getMostRecentMessage are async statics; the
+    // old node-callback form was dropped under Mongoose 8, so this handler
+    // never sent an update and the conversation-notification list was dead.
+    const conversations = await Conversation.getConversationsWithLimit(user._id, null)
+    const convos = []
+
+    for (const convo of conversations) {
+      const c = convo.toObject()
+
+      const userMeta = convo.userMeta[convo.userMeta.findIndex(i => i.userId.toString() === user._id.toString())]
+      if (userMeta !== undefined && userMeta.deletedAt !== undefined && userMeta.deletedAt > convo.updatedAt) {
+        continue
       }
 
-      const convos = []
+      let rm = await Message.getMostRecentMessage(c._id)
 
-      async.eachSeries(
-        conversations,
-        (convo, done) => {
-          const c = convo.toObject()
-
-          const userMeta = convo.userMeta[convo.userMeta.findIndex(i => i.userId.toString() === user._id.toString())]
-          if (userMeta !== undefined && userMeta.deletedAt !== undefined && userMeta.deletedAt > convo.updatedAt) {
-            return done()
-          }
-
-          Message.getMostRecentMessage(c._id, (err, rm) => {
-            if (err) return done(err)
-
-            c.participants.forEach(p => {
-              if (p._id.toString() !== user._id.toString()) {
-                c.partner = p
-              }
-            })
-
-            rm = rm[0]
-
-            if (rm !== undefined) {
-              if (!c.partner || !rm.owner) return done()
-
-              if (c.partner._id.toString() === rm.owner._id.toString()) {
-                c.recentMessage = c.partner.fullname + ': ' + rm.body
-              } else {
-                c.recentMessage = 'You: ' + rm.body
-              }
-            } else {
-              c.recentMessage = 'New Conversation'
-            }
-
-            convos.push(c)
-
-            return done()
-          })
-        },
-        err => {
-          if (err) return false
-
-          return utils.sendToSelf(socket, socketEventConst.MESSAGES_UPDATE_UI_CONVERSATION_NOTIFICATIONS, {
-            conversations: convos.length >= 10 ? convos.slice(0, 9) : convos
-          })
+      c.participants.forEach(p => {
+        if (p._id.toString() !== user._id.toString()) {
+          c.partner = p
         }
-      )
+      })
+
+      rm = rm[0]
+
+      if (rm !== undefined) {
+        if (!c.partner || !rm.owner) continue
+
+        if (c.partner._id.toString() === rm.owner._id.toString()) {
+          c.recentMessage = c.partner.fullname + ': ' + rm.body
+        } else {
+          c.recentMessage = 'You: ' + rm.body
+        }
+      } else {
+        c.recentMessage = 'New Conversation'
+      }
+
+      convos.push(c)
+    }
+
+    return utils.sendToSelf(socket, socketEventConst.MESSAGES_UPDATE_UI_CONVERSATION_NOTIFICATIONS, {
+      conversations: convos.length >= 10 ? convos.slice(0, 9) : convos
     })
+  } catch (err) {
+    winston.warn(err.message || err)
   }
 }
 
@@ -247,39 +237,42 @@ events.updateConversationsNotifications = function (socket) {
   })
 }
 
-function spawnOpenChatWindows (socket) {
+async function spawnOpenChatWindows (socket) {
   const loggedInAccountId = socket.request.user._id
   const userSchema = require('../models/user')
   const conversationSchema = require('../models/chat/conversation')
-  userSchema.getUser(loggedInAccountId, function (err, user) {
-    if (err) return true
 
-    async.eachSeries(user.preferences.openChatWindows, function (convoId, done) {
+  try {
+    // getUser / getConversation are async statics; their dropped callbacks
+    // meant open chat windows were never re-spawned on reconnect.
+    const user = await userSchema.getUser(loggedInAccountId)
+    if (!user || !user.preferences || !user.preferences.openChatWindows) return
+
+    for (const convoId of user.preferences.openChatWindows) {
       let partner = null
-      conversationSchema.getConversation(convoId, function (err, conversation) {
-        if (err || !conversation) return done()
-        conversation.participants.forEach(function (i) {
-          if (i._id.toString() !== loggedInAccountId.toString()) {
-            partner = i.toObject()
-            return partner
-          }
-        })
+      const conversation = await conversationSchema.getConversation(convoId)
+      if (!conversation) continue
 
-        if (partner === null) return done()
-
-        delete partner.password
-        delete partner.resetPassHash
-        delete partner.resetPassExpire
-        delete partner.accessToken
-        delete partner.iOSDeviceTokens
-        delete partner.deleted
-
-        utils.sendToSelf(socket, 'spawnChatWindow', partner)
-
-        return done()
+      conversation.participants.forEach(function (i) {
+        if (i._id.toString() !== loggedInAccountId.toString()) {
+          partner = i.toObject()
+        }
       })
-    })
-  })
+
+      if (partner === null) continue
+
+      delete partner.password
+      delete partner.resetPassHash
+      delete partner.resetPassExpire
+      delete partner.accessToken
+      delete partner.iOSDeviceTokens
+      delete partner.deleted
+
+      utils.sendToSelf(socket, 'spawnChatWindow', partner)
+    }
+  } catch (err) {
+    winston.warn(err)
+  }
 }
 
 events.getOpenChatWindows = function (socket) {
@@ -289,12 +282,12 @@ events.getOpenChatWindows = function (socket) {
 }
 
 events.spawnChatWindow = function (socket) {
-  socket.on(socketEventConst.MESSAGES_SPAWN_CHAT_WINDOW, function ({ convoId }) {
+  socket.on(socketEventConst.MESSAGES_SPAWN_CHAT_WINDOW, async function ({ convoId }) {
     if (!socket.request.user || !convoId) return true
 
     const User = require('../models/user')
-    User.getUser(socket.request.user._id, function (err, user) {
-      if (err) return true
+    try {
+      const user = await User.getUser(socket.request.user._id)
       if (user !== null) {
         user.addOpenChatWindow(convoId)
 
@@ -306,17 +299,19 @@ events.spawnChatWindow = function (socket) {
           user
         )
       }
-    })
+    } catch (err) {
+      winston.warn(err)
+    }
   })
 }
 
 events.saveChatWindow = function (socket) {
-  socket.on(socketEventConst.MESSAGES_SAVE_CHAT_WINDOW, function (data) {
+  socket.on(socketEventConst.MESSAGES_SAVE_CHAT_WINDOW, async function (data) {
     const { userId, convoId, remove } = data
 
     const User = require('../models/user')
-    User.getUser(userId, function (err, user) {
-      if (err) return true
+    try {
+      const user = await User.getUser(userId)
       if (user !== null) {
         if (remove) {
           user.removeOpenChatWindow(convoId)
@@ -331,12 +326,14 @@ events.saveChatWindow = function (socket) {
           socketEventConst.MESSAGES_SAVE_CHAT_WINDOW_COMPLETE
         )
       }
-    })
+    } catch (err) {
+      winston.warn(err)
+    }
   })
 }
 
 events.onChatMessage = function (socket) {
-  socket.on(socketEventConst.MESSAGES_SEND, function (data) {
+  socket.on(socketEventConst.MESSAGES_SEND, async function (data) {
     const to = data.to
     const from = data.from
 
@@ -353,69 +350,53 @@ events.onChatMessage = function (socket) {
       id: data.message.owner._id
     }
 
-    async.parallel(
-      [
-        function (next) {
-          User.getUser(to, function (err, toUser) {
-            if (err) return next(err)
-            if (!toUser) return next('User Not Found!')
+    try {
+      // getUser is an async static — resolve both participants in parallel.
+      const [toUser, fromUser] = await Promise.all([User.getUser(to), User.getUser(from)])
+      if (!toUser) throw new Error('User Not Found!')
+      if (!fromUser) throw new Error('User Not Found')
 
-            // Strip
-            data.toUser = {
-              _id: toUser._id,
-              email: toUser.email,
-              username: toUser.username,
-              fullname: toUser.fullname,
-              image: toUser.image,
-              title: toUser.title,
-              lastOnline: toUser.lastOnline,
-              id: toUser._id
-            }
-
-            return next()
-          })
-        },
-        function (next) {
-          User.getUser(from, function (err, fromUser) {
-            if (err) return next(err)
-            if (!fromUser) return next('User Not Found')
-
-            // Strip
-            data.fromUser = {
-              _id: fromUser._id,
-              email: fromUser.email,
-              username: fromUser.username,
-              fullname: fromUser.fullname,
-              image: fromUser.image,
-              title: fromUser.title,
-              lastOnline: fromUser.lastOnline,
-              id: fromUser._id
-            }
-
-            return next()
-          })
-        }
-      ],
-      function (err) {
-        if (err) return utils.sendToSelf(socket, socketEventConst.MESSAGES_UI_RECEIVE, { message: err })
-
-        utils.sendToUser(
-          sharedVars.sockets,
-          sharedVars.usersOnline,
-          data.toUser.username,
-          socketEventConst.MESSAGES_UI_RECEIVE,
-          data
-        )
-
-        utils.sendToUser(
-          sharedVars.sockets,
-          sharedVars.usersOnline,
-          data.fromUser.username,
-          socketEventConst.MESSAGES_UI_RECEIVE,
-          data
-        )
+      // Strip
+      data.toUser = {
+        _id: toUser._id,
+        email: toUser.email,
+        username: toUser.username,
+        fullname: toUser.fullname,
+        image: toUser.image,
+        title: toUser.title,
+        lastOnline: toUser.lastOnline,
+        id: toUser._id
       }
-    )
+
+      data.fromUser = {
+        _id: fromUser._id,
+        email: fromUser.email,
+        username: fromUser.username,
+        fullname: fromUser.fullname,
+        image: fromUser.image,
+        title: fromUser.title,
+        lastOnline: fromUser.lastOnline,
+        id: fromUser._id
+      }
+
+      utils.sendToUser(
+        sharedVars.sockets,
+        sharedVars.usersOnline,
+        data.toUser.username,
+        socketEventConst.MESSAGES_UI_RECEIVE,
+        data
+      )
+
+      utils.sendToUser(
+        sharedVars.sockets,
+        sharedVars.usersOnline,
+        data.fromUser.username,
+        socketEventConst.MESSAGES_UI_RECEIVE,
+        data
+      )
+    } catch (err) {
+      return utils.sendToSelf(socket, socketEventConst.MESSAGES_UI_RECEIVE, { message: err.message || err })
+    }
   })
 }
 
@@ -546,14 +527,19 @@ events.onDisconnect = function (socket) {
       if (i !== -1) sharedVars.sockets.splice(i, 1)
     }
 
-    // Save lastOnline Time
-    userSchema.getUser(user._id, function (err, u) {
-      if (!err && u) {
-        u.lastOnline = new Date()
-
-        u.save()
-      }
-    })
+    // Save lastOnline Time. getUser is an async static; drive it via the
+    // promise instead of the dropped node callback.
+    userSchema
+      .getUser(user._id)
+      .then(function (u) {
+        if (u) {
+          u.lastOnline = new Date()
+          return u.save()
+        }
+      })
+      .catch(function (err) {
+        winston.warn(err)
+      })
 
     // updateOnlineBubbles()
 

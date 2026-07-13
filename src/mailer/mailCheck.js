@@ -162,6 +162,14 @@ function bindImapReady () {
                   bodies: ''
                 })
 
+                // Collect one promise per message. simpleParser is async, so
+                // the original code flagged the mails (\Seen / \Deleted) in
+                // f.on('end') BEFORE the parse callbacks had pushed their
+                // messages — any still-parsing mail was flagged read/deleted
+                // yet never handled, i.e. silently lost. Only flag + handle
+                // once every parse has settled (Promise.all below).
+                const parsePromises = []
+
                 f.on('message', function (msg) {
                   msg.on('body', function (stream) {
                     const message = {}
@@ -171,39 +179,45 @@ function bindImapReady () {
                     })
 
                     stream.once('end', function () {
-                      simpleParser(buffer, function (err, mail) {
-                        if (err) winston.warn(err)
+                      const parsed = simpleParser(buffer)
+                        .then(function (mail) {
+                          if (mail.headers.has('from')) {
+                            message.from = mail.headers.get('from').value[0].address
+                          }
 
-                        if (mail.headers.has('from')) {
-                          message.from = mail.headers.get('from').value[0].address
-                        }
+                          if (mail.subject) {
+                            message.subject = mail.subject
+                          } else {
+                            message.subject = message.from
+                          }
 
-                        if (mail.subject) {
-                          message.subject = mail.subject
-                        } else {
-                          message.subject = message.from
-                        }
+                          if (mail.textAsHtml === undefined) {
+                            const $ = cheerio.load(mail.html)
+                            const $body = $('body')
+                            message.body = $body.length > 0 ? $body.html() : mail.html
+                          } else {
+                            message.body = mail.textAsHtml
+                          }
 
-                        if (mail.textAsHtml === undefined) {
-                          const $ = cheerio.load(mail.html)
-                          const $body = $('body')
-                          message.body = $body.length > 0 ? $body.html() : mail.html
-                        } else {
-                          message.body = mail.textAsHtml
-                        }
+                          mailCheck.messages.push(message)
+                        })
+                        .catch(function (err) {
+                          winston.warn(err)
+                        })
 
-                        mailCheck.messages.push(message)
-                      })
+                      parsePromises.push(parsed)
                     })
                   })
                 })
 
                 f.on('end', function () {
-                  mailCheck.Imap.addFlags(results, flag, function () {
-                    mailCheck.Imap.closeBox(true, function () {
-                      mailCheck.Imap.end()
-                      handleMessages(mailCheck.messages, function () {
-                        mailCheck.Imap.destroy()
+                  Promise.all(parsePromises).then(function () {
+                    mailCheck.Imap.addFlags(results, flag, function () {
+                      mailCheck.Imap.closeBox(true, function () {
+                        mailCheck.Imap.end()
+                        handleMessages(mailCheck.messages, function () {
+                          mailCheck.Imap.destroy()
+                        })
                       })
                     })
                   })

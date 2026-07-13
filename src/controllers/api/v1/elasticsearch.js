@@ -12,7 +12,6 @@
 
  **/
 
-const async = require('async')
 const es = require('../../../elasticsearch')
 const ticketSchema = require('../../../models/ticket')
 const groupSchema = require('../../../models/group')
@@ -25,36 +24,36 @@ apiElasticSearch.rebuild = function (req, res) {
   return res.json({ success: true })
 }
 
-apiElasticSearch.status = function (req, res) {
+apiElasticSearch.status = async function (req, res) {
   const response = {
     esStatus: global.esStatus
   }
 
-  async.parallel([
-    function (done) {
-      es.getIndexCount(function (err, data) {
-        if (err) return done(err)
-        response.indexCount = (data.count !== undefined ? data.count : 0)
-        return done()
-      })
-    },
-    function (done) {
-      ticketSchema.getCount(function (err, count) {
-        if (err) return done(err)
-        response.dbCount = count
-        return done()
-      })
-    }
-  ], function (err) {
-    if (err) return res.status(500).json({ success: false, error: err })
+  try {
+    // ticketSchema.getCount is an async static now; the old async.parallel fed
+    // it a node callback that was dropped, so dbCount stayed undefined and the
+    // response never sent. es.getIndexCount is still callback-based, so wrap it.
+    const [indexData, dbCount] = await Promise.all([
+      new Promise(function (resolve, reject) {
+        es.getIndexCount(function (err, data) {
+          if (err) return reject(err)
+          return resolve(data)
+        })
+      }),
+      ticketSchema.getCount()
+    ])
 
+    response.indexCount = indexData && indexData.count !== undefined ? indexData.count : 0
+    response.dbCount = dbCount
     response.inSync = response.dbCount === response.indexCount
 
-    res.json({ success: true, status: response })
-  })
+    return res.json({ success: true, status: response })
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err })
+  }
 }
 
-apiElasticSearch.search = function (req, res) {
+apiElasticSearch.search = async function (req, res) {
   let limit = (req.query.limit !== undefined ? req.query.limit : 100)
   try {
     limit = parseInt(limit)
@@ -62,8 +61,10 @@ apiElasticSearch.search = function (req, res) {
     limit = 100
   }
 
-  groupSchema.getAllGroupsOfUserNoPopulate(req.user._id, function (err, groups) {
-    if (err) return res.status(400).json({ success: false, error: err })
+  try {
+    // getAllGroupsOfUserNoPopulate is an async static; the dropped callback
+    // meant this handler never resolved the user's groups nor sent a response.
+    const groups = await groupSchema.getAllGroupsOfUserNoPopulate(req.user._id)
 
     const g = groups.map(function (i) { return i._id })
 
@@ -104,10 +105,11 @@ apiElasticSearch.search = function (req, res) {
       }
     }
 
-    es.esclient.search(obj).then(function (r) {
-      res.send(r)
-    })
-  })
+    const r = await es.esclient.search(obj)
+    return res.send(r)
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err })
+  }
 }
 
 module.exports = apiElasticSearch
