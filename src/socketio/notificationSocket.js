@@ -83,6 +83,17 @@ events.markNotificationRead = function (socket) {
     const notificationSchema = require('../models/notification')
     try {
       const notification = await notificationSchema.getNotification(_id)
+      if (!notification) return
+
+      // Only the owner may mark their own notification read — otherwise any
+      // authenticated client could flip the unread flag on someone else's
+      // notification by guessing/enumerating its id.
+      const userId = socket.request.user && socket.request.user._id
+      if (!userId || !notification.owner || notification.owner.toString() !== userId.toString()) {
+        winston.warn('[notificationSocket] - Rejected mark-read of a notification the user does not own.')
+        return
+      }
+
       await notification.markRead()
       await notification.save()
       updateNotifications(socket)
