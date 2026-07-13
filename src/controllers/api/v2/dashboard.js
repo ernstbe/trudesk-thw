@@ -3,11 +3,16 @@ const Status = require('../../../models/ticketStatus')
 const RecurringTask = require('../../../models/recurringTask')
 const Asset = require('../../../models/asset')
 const apiUtil = require('../apiUtils')
+const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
 
 const dashboardApi = {}
 
 dashboardApi.widgets = async function (req, res) {
   try {
+    // Scope every ticket count to the caller's visible groups so a Jugend
+    // agent's dashboard never reflects Stab ticket counts, and vice versa.
+    const visibleGroups = await resolveVisibleGroups(req.user)
+
     // Get Beschluss-related status IDs
     const allStatuses = await Status.getStatus()
     const beschlussStatusIds = allStatuses
@@ -23,7 +28,8 @@ dashboardApi.widgets = async function (req, res) {
     if (beschlussStatusIds.length > 0) {
       beschluesse = await Ticket.countDocuments({
         status: { $in: beschlussStatusIds },
-        deleted: false
+        deleted: false,
+        group: { $in: visibleGroups }
       })
     }
 
@@ -46,6 +52,7 @@ dashboardApi.widgets = async function (req, res) {
     const overdue = await Ticket.countDocuments({
       dueDate: { $lt: new Date() },
       deleted: false,
+      group: { $in: visibleGroups },
       status: {
         $in: allStatuses
           .filter(function (s) {

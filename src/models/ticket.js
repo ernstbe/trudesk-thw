@@ -827,8 +827,21 @@ function buildQueryWithObject (SELF, grpId, object, count) {
     // Tags Filter
     if (object.filter.tags) query.where({ tags: { $in: object.filter.tags } })
 
-    // Assignee Filter
-    if (object.filter.assignee) query.where({ assignee: { $in: object.filter.assignee } })
+    // Assignee Filter — match the primary assignee OR any additional assignee
+    // (mirrors statics.getAssigned). Wrapped in $and so it composes as a
+    // conjunction with the .or() subject/issue/uid filters below instead of
+    // being merged into their $or. Fixes the v2 type=assigned list, which
+    // otherwise dropped tickets where the user is only an additional assignee.
+    if (object.filter.assignee) {
+      query.and([
+        {
+          $or: [
+            { assignee: { $in: object.filter.assignee } },
+            { additionalAssignees: { $in: object.filter.assignee } }
+          ]
+        }
+      ])
+    }
 
     // Unassigned Filter
     if (object.filter.unassigned) query.where({ assignee: { $exists: false } })

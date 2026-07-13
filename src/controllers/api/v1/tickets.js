@@ -223,7 +223,29 @@ apiTickets.getByGroup = async function (req, res) {
 
   try {
     const ticketSchema = require('../../../models/ticket')
+    const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
+
+    // This handler is mounted under v2 WITHOUT isAdmin, so any tickets:view
+    // holder could otherwise read tickets — including internal notes — of ANY
+    // group by id. Scope non-admins to their visible groups: a group they
+    // cannot see → 403. Admins keep full access (the isAdmin-gated v1 route is
+    // therefore unaffected, matching prior behaviour).
+    if (!req.user.role.isAdmin) {
+      const visible = (await resolveVisibleGroups(req.user)).map(g => g.toString())
+      if (!visible.includes(groupId.toString())) {
+        return res.status(403).json({ success: false, error: 'Forbidden' })
+      }
+    }
+
     const tickets = await ticketSchema.getTicketsWithObject([groupId], obj)
+
+    // Strip internal notes for callers who lack the notes permission.
+    if (!permissions.canThis(req.user.role, 'tickets:notes')) {
+      tickets.forEach(function (ticket) {
+        ticket.notes = []
+      })
+    }
+
     return res.json({ success: true, tickets, count: tickets.length })
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message })

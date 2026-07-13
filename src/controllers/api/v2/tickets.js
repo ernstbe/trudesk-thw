@@ -24,6 +24,7 @@ const ticketStatusSchema = require('../../../models/ticketStatus')
 const { getDeadlineStatus } = require('../../../helpers/deadlineHelper')
 const { resolveDefaultTicketStatus } = require('../../../helpers/defaultTicketStatus')
 const { parseChecklistField } = require('./checklistParser')
+const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
 
 const ticketsV2 = {}
 
@@ -568,6 +569,10 @@ ticketsV2.checklist.add = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    // Restrict the generic tickets:update grant to tickets in the caller's
+    // own groups (same Jugend/Stab gate as .update/.delete).
+    await assertTicketGroupVisible(req.user, ticket)
+
     ticket.checklist.push({ title })
     ticket.updated = new Date()
 
@@ -582,6 +587,7 @@ ticketsV2.checklist.add = async function (req, res) {
 
     return apiUtils.sendApiSuccess(res, { ticket })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
@@ -698,6 +704,10 @@ ticketsV2.links.add = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    // Same Jugend/Stab gate as .update/.delete: only tickets in the caller's
+    // own groups may be linked from.
+    await assertTicketGroupVisible(req.user, ticket)
+
     const target = await Models.Ticket.getTicketByUid(targetUid)
     if (!target) return apiUtils.sendApiError(res, 404, 'Target ticket not found')
 
@@ -727,6 +737,7 @@ ticketsV2.links.add = async function (req, res) {
     const populated = await Models.Ticket.getTicketByUid(uid)
     return apiUtils.sendApiSuccess(res, { ticket: populated })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
@@ -794,6 +805,10 @@ ticketsV2.postComment = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    // A comment mutates the ticket, so gate it by the same group visibility
+    // as .update/.delete (Jugend must not comment on Stab tickets).
+    await assertTicketGroupVisible(req.user, ticket)
+
     marked.setOptions({ breaks: true })
     // Preserve user line breaks AND blank lines: convert newlines to <br>
     // before marked.parse, otherwise marked collapses any run of blank
@@ -822,6 +837,7 @@ ticketsV2.postComment = async function (req, res) {
     emitter.emit('ticket:comment:added', saved, commentDoc, req.headers.host)
     return apiUtils.sendApiSuccess(res, { ticket: saved })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
@@ -839,6 +855,9 @@ ticketsV2.postNote = async function (req, res) {
   try {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    // Internal notes are only for agents who can see the ticket's group.
+    await assertTicketGroupVisible(req.user, ticket)
 
     marked.setOptions({ breaks: true })
     // See postComment: protect blank lines from marked's paragraph collapse.
@@ -869,6 +888,7 @@ ticketsV2.postNote = async function (req, res) {
     emitter.emit('ticket:note:added', saved, noteDoc)
     return apiUtils.sendApiSuccess(res, { ticket: saved })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
@@ -889,6 +909,10 @@ ticketsV2.subscribe = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    // Don't let a user subscribe to (and thus receive updates about) a
+    // ticket in a group they cannot see.
+    await assertTicketGroupVisible(req.user, ticket)
+
     if (subscribe) {
       await ticket.addSubscriber(req.user._id)
     } else {
@@ -899,27 +923,16 @@ ticketsV2.subscribe = async function (req, res) {
     emitter.emit('ticket:subscriber:update', saved)
     return apiUtils.sendApiSuccess(res, { ticket: saved })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
 }
 
-// -------------------------------------------------------------------
-// Group visibility — the single source of truth for "which groups may
-// this user see". MUST stay identical to the gate used by the ticket
-// list (ticketsV2.get) so the statistics page can never surface tickets
-// the user could not open: Jugend never sees Stab and vice versa.
-// -------------------------------------------------------------------
-async function resolveVisibleGroups (user) {
-  let groups = []
-  if (user.role.isAdmin || user.role.isAgent) {
-    const dbGroups = await Models.Department.getDepartmentGroupsOfUser(user._id)
-    groups = dbGroups.map(g => g._id)
-  } else {
-    groups = await Models.Group.getAllGroupsOfUser(user._id)
-  }
-  return groups.map(g => g._id)
-}
+// Group visibility ("which groups may this user see") is resolved by the
+// shared helper imported at the top of this file (resolveVisibleGroups) so
+// the list, single-ticket read, calendar, dashboard and stats endpoints all
+// enforce the identical Jugend/Stab boundary.
 
 // Throws a 403-tagged error if the ticket's group is not visible to the
 // user — the same gate the single-ticket read (ticketsV2.single) applies.
