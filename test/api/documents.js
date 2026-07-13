@@ -52,6 +52,28 @@ describe('api/documents.js', function () {
       })
   })
 
+  it('should strip path components from a crafted filename (LFI regression)', function (done) {
+    agent
+      .post(baseUrl + '/api/v2/documents')
+      .type('json')
+      .send({
+        name: 'Traversal Test',
+        filename: '../../../../../../etc/passwd',
+        originalFilename: 'evil.pdf'
+      })
+      .end(function (_err, res) {
+        if (_err) return done(_err)
+        expect(res.status).to.equal(200)
+        expect(res.body.success).to.be.true
+        // The stored filename must never retain directory components, else it
+        // could escape the uploads dir when joined for download/delete.
+        expect(res.body.document.filename).to.equal('passwd')
+        expect(res.body.document.filename).to.not.contain('/')
+        expect(res.body.document.filename).to.not.contain('..')
+        done()
+      })
+  })
+
   it('should reject document creation without name', function (done) {
     agent
       .post(baseUrl + '/api/v2/documents')

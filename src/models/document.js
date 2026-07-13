@@ -2,10 +2,19 @@ const mongoose = require('mongoose')
 
 const COLLECTION = 'documents'
 
+// Defense in depth against path traversal / LFI: `filename` is later joined
+// onto the uploads directory to read/delete the file from disk, so it must
+// never contain directory components. Strip anything up to and including the
+// last path separator (both POSIX "/" and Windows "\") on assignment.
+function stripPathSeparators (v) {
+  if (typeof v !== 'string') return v
+  return v.replace(/^.*[\\/]/, '')
+}
+
 const documentSchema = mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String },
-  filename: { type: String, required: true },
+  filename: { type: String, required: true, set: stripPathSeparators },
   originalFilename: { type: String, required: true },
   mimetype: { type: String },
   size: { type: Number },
