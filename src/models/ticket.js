@@ -420,11 +420,16 @@ ticketSchema.methods.setTicketGroup = async function (ownerId, groupId) {
 }
 
 ticketSchema.methods.setTicketDueDate = function (ownerId, dueDate) {
-  this.dueDate = dueDate
+  // Store a cleared date as `undefined`, never `null`: mongoose then removes
+  // the field on save, so API payloads omit `dueDate` entirely instead of
+  // emitting `"dueDate": null` — strict clients (the PWA before its
+  // tolerant-parsing fix) fail on the explicit null and lose the whole
+  // ticket list. Covers both callers (REST update helper + socket UI).
+  this.dueDate = dueDate == null ? undefined : dueDate
 
   const historyItem = {
     action: 'ticket:set:duedate',
-    description: 'Ticket Due Date set to: ' + this.dueDate,
+    description: this.dueDate ? 'Ticket Due Date set to: ' + this.dueDate : 'Ticket Due Date removed',
     owner: ownerId
   }
 

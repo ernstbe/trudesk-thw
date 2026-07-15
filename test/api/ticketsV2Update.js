@@ -208,13 +208,21 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
     expect(unchanged.history.filter(h => h.action === 'ticket:set:duedate').length).to.equal(dueDateEntriesBefore + 1)
   })
 
-  it('clears the dueDate via null', async function () {
+  it('clears the dueDate via null and omits the field from payloads', async function () {
     const res = await put('/api/v2/tickets/' + ticketUid, { ticket: { dueDate: null } })
     expect(res.status).to.equal(200)
     expect(res.body.success).to.be.true
 
     const fresh = await freshTicket()
-    expect(fresh.dueDate === null || fresh.dueDate === undefined).to.be.true
+    // The field must be gone entirely, not stored as an explicit null: a
+    // `"dueDate": null` in list payloads crashed strict clients (the PWA)
+    // and blanked their entire ticket list.
+    expect(fresh.dueDate).to.equal(undefined)
+    expect(Object.prototype.hasOwnProperty.call(fresh, 'dueDate')).to.equal(false)
+
+    // The history entry for a clear reads "removed" instead of "set to: undefined".
+    const clearEntries = fresh.history.filter(h => h.action === 'ticket:set:duedate')
+    expect(clearEntries[clearEntries.length - 1].description).to.equal('Ticket Due Date removed')
   })
 
   it('rejects an unparsable dueDate with 400', async function () {
