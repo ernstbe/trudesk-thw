@@ -17,6 +17,7 @@ const StatusSchema = require('../../../models/ticketStatus')
 const GroupSchema = require('../../../models/group')
 const apiUtil = require('../apiUtils')
 const pdfGenerator = require('../../../helpers/pdfGenerator')
+const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
 
 const reportsApi = {}
 
@@ -29,6 +30,13 @@ reportsApi.handover = async function (req, res) {
   try {
     const group = await GroupSchema.findById(groupId)
     if (!group) return apiUtil.sendApiError(res, 404, 'Group not found')
+
+    // Same visibility gate as ticketsV2.single: fetch first (404 if the id
+    // doesn't resolve to anything), then check the caller may see it (403).
+    // A Jugend agent must not be able to pull a Stab group's handover report
+    // by enumerating its id.
+    const visibleGroups = (await resolveVisibleGroups(req.user)).map(g => g.toString())
+    if (!visibleGroups.includes(groupId.toString())) return apiUtil.sendApiError(res, 403, 'Forbidden')
 
     const unresolvedStatuses = await StatusSchema.find({ isResolved: false })
     const unresolvedIds = unresolvedStatuses.map(function (s) { return s._id })
@@ -98,10 +106,12 @@ reportsApi.sitzung = async function (req, res) {
 
   try {
     const populateFields = 'owner assignee type status tags group priority'
+    const visibleGroups = await resolveVisibleGroups(req.user)
 
     const openedTickets = await Ticket.find({
       date: { $gte: sinceDate },
-      deleted: false
+      deleted: false,
+      group: { $in: visibleGroups }
     })
       .populate(populateFields)
       .sort({ date: -1 })
@@ -109,7 +119,8 @@ reportsApi.sitzung = async function (req, res) {
 
     const closedTickets = await Ticket.find({
       closedDate: { $gte: sinceDate },
-      deleted: false
+      deleted: false,
+      group: { $in: visibleGroups }
     })
       .populate(populateFields)
       .sort({ closedDate: -1 })
