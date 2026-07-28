@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { connect } from 'react-redux'
 import { withTranslation } from 'react-i18next'
@@ -10,12 +10,17 @@ import BaseModal from './BaseModal'
 import Button from 'components/Button'
 
 import { fetchSettings } from 'actions/settings'
+import { fetchTicketStatus } from 'actions/tickets'
 import Log from '../../logger'
 import api from 'api/index'
 
 import helpers from 'lib/helpers'
 
-const AddStatusToTypeModal = ({ statuses, type, fetchSettings, t }) => {
+const AddStatusToTypeModal = ({ statuses, type, fetchSettings, fetchTicketStatus, t }) => {
+  useEffect(() => {
+    fetchTicketStatus()
+  }, [fetchTicketStatus])
+
   const getStatuses = useCallback(() => {
     if (!statuses) {
       return []
@@ -133,6 +138,7 @@ AddStatusToTypeModal.propTypes = {
   statuses: PropTypes.object,
   type: PropTypes.object.isRequired,
   fetchSettings: PropTypes.func.isRequired,
+  fetchTicketStatus: PropTypes.func.isRequired,
   t: PropTypes.func.isRequired
 }
 
@@ -142,5 +148,5 @@ const mapStateToProps = state => ({
 
 export default withTranslation()(connect(
   mapStateToProps,
-  { fetchSettings }
+  { fetchSettings, fetchTicketStatus }
 )(AddStatusToTypeModal))
