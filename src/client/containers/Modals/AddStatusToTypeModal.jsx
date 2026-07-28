@@ -17,12 +17,19 @@ import helpers from 'lib/helpers'
 
 const AddStatusToTypeModal = ({ statuses, type, fetchSettings, t }) => {
   const getStatuses = useCallback(() => {
-    // support Immutable collections, plain arrays, or plain objects
-    if (!statuses) return []
-    if (typeof statuses.toArray === 'function') return statuses.toArray()
-    if (Array.isArray(statuses)) return statuses
-    if (typeof statuses === 'object') return Object.values(statuses)
-    return []
+    if (!statuses) {
+      return []
+    }
+
+    if (typeof statuses.toArray === 'function') {
+      return statuses.toArray()
+    }
+
+    if (Array.isArray(statuses)) {
+      return statuses
+    }
+
+    return Object.values(statuses)
   }, [statuses])
 
   const onAddClick = useCallback((e, type, status) => {
