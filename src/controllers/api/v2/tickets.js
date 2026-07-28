@@ -43,6 +43,43 @@ ticketsV2.create = async function (req, res) {
   if (!checklistResult.ok) return apiUtils.sendApiError(res, 400, checklistResult.error)
   delete postData.checklist
 
+  // Same reasoning for comments/notes/metadata: cast onto the schema raw they
+  // let a caller forge comment/note owner+date (impersonation/backdating),
+  // skip the sanitize-on-save the comment/note controllers apply (stored
+  // XSS), and inject internal notes without the tickets:notes permission.
+  // There's no legitimate use for seeding any of these at creation time, so
+  // they're dropped rather than validated.
+  delete postData.comments
+  delete postData.notes
+  delete postData.metadata
+
+  // assignee/additionalAssignees are pulled out too so they go through the
+  // same validating model methods (with history + notify/subscribe) the
+  // update path uses, instead of being cast onto the document unchecked.
+  const rawAssignee = postData.assignee
+  const rawAdditionalAssignees = postData.additionalAssignees
+  delete postData.assignee
+  delete postData.additionalAssignees
+
+  const mongoose = require('mongoose')
+  let assigneeId = null
+  if (rawAssignee !== undefined && rawAssignee !== null && rawAssignee !== '') {
+    assigneeId = (rawAssignee._id || rawAssignee).toString()
+    if (!mongoose.Types.ObjectId.isValid(assigneeId)) {
+      return apiUtils.sendApiError(res, 400, 'Invalid assignee')
+    }
+  }
+  let additionalAssigneeIds = null
+  if (rawAdditionalAssignees !== undefined && rawAdditionalAssignees !== null) {
+    if (!Array.isArray(rawAdditionalAssignees)) {
+      return apiUtils.sendApiError(res, 400, 'Invalid additionalAssignees')
+    }
+    additionalAssigneeIds = [...new Set(rawAdditionalAssignees.map(a => (a._id || a).toString()))]
+    if (!additionalAssigneeIds.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return apiUtils.sendApiError(res, 400, 'Invalid additionalAssignees')
+    }
+  }
+
   try {
     const user = await Models.User.findOne({ _id: req.user._id })
     if (!user || user.deleted) return apiUtils.sendApiError(res, 400, 'Invalid User')
@@ -98,6 +135,20 @@ ticketsV2.create = async function (req, res) {
     ]
     ticket.subscribers = [user._id]
 
+    if (assigneeId) {
+      ticket.assignee = assigneeId
+      ticket.history.push({
+        action: 'ticket:set:assignee',
+        description: 'Assignee was set',
+        owner: req.user._id
+      })
+      ticket.addSubscriber(assigneeId)
+    }
+    if (additionalAssigneeIds) {
+      await ticket.setAdditionalAssignees(req.user._id, additionalAssigneeIds)
+      for (const id of additionalAssigneeIds) ticket.addSubscriber(id)
+    }
+
     const saved = await ticket.save()
     const populated = await saved.populate('group owner priority')
 
@@ -106,6 +157,17 @@ ticketsV2.create = async function (req, res) {
       socketId: postData.socketId || '',
       ticket: populated
     })
+
+    if (assigneeId) {
+      await require('../../../helpers/notifyAssignee')(assigneeId, req.user._id, populated)
+    }
+    if (additionalAssigneeIds) {
+      const notifyAssignee = require('../../../helpers/notifyAssignee')
+      for (const id of additionalAssigneeIds) {
+        emitter.emit('ticket:subscriber:update', { user: id, subscribe: true })
+        await notifyAssignee(id, req.user._id, populated)
+      }
+    }
 
     return apiUtils.sendApiSuccess(res, { ticket: populated })
   } catch (err) {
@@ -711,6 +773,11 @@ ticketsV2.links.add = async function (req, res) {
     const target = await Models.Ticket.getTicketByUid(targetUid)
     if (!target) return apiUtils.sendApiError(res, 404, 'Target ticket not found')
 
+    // The target ticket must be just as visible to the caller as the
+    // source — otherwise a Jugend agent could link (and thereby read the
+    // subject/status of) a Stab ticket by enumerating its uid.
+    await assertTicketGroupVisible(req.user, target)
+
     const alreadyLinked = (ticket.linkedTickets || []).some(
       l => l.ticket && l.ticket._id.toString() === target._id.toString()
     )
@@ -752,8 +819,12 @@ ticketsV2.links.remove = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
+    await assertTicketGroupVisible(req.user, ticket)
+
     const target = await Models.Ticket.getTicketByUid(targetUid)
     if (!target) return apiUtils.sendApiError(res, 404, 'Target ticket not found')
+
+    await assertTicketGroupVisible(req.user, target)
 
     const hadLink = (ticket.linkedTickets || []).some(
       l => l.ticket && l.ticket._id.toString() === target._id.toString()
@@ -784,6 +855,7 @@ ticketsV2.links.remove = async function (req, res) {
     const populated = await Models.Ticket.getTicketByUid(uid)
     return apiUtils.sendApiSuccess(res, { ticket: populated })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message)
   }
