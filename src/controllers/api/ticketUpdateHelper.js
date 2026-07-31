@@ -119,27 +119,40 @@ async function applyTicketUpdate (ticket, reqTicket, user) {
     ticket.issue = sanitizeHtml(reqTicket.issue).trim()
   }
 
-  if (reqTicket.assignee !== undefined && reqTicket.assignee !== null) {
-    const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
-    ticket.assignee = reqTicket.assignee._id || reqTicket.assignee
-    await ticket.populate('assignee')
+  if (reqTicket.assignee !== undefined) {
+    if (reqTicket.assignee === null) {
+      // Explicit null clears the assignee (mirrors the dedicated v1 DELETE
+      // /tickets/:id/assignee route, which the PWA does NOT call - it sends
+      // `assignee: null` through this same generic update path in both v1
+      // and v2 mode). This used to be silently ignored, so "unassign" was a
+      // no-op that reported success. Only touch history if there actually
+      // was an assignee, so a payload that just echoes back `assignee: null`
+      // on an already-unassigned ticket doesn't spam the history.
+      if (ticket.assignee) {
+        ticket.clearAssignee(userId)
+      }
+    } else {
+      const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
+      ticket.assignee = reqTicket.assignee._id || reqTicket.assignee
+      await ticket.populate('assignee')
 
-    const assigneeName = ticket.assignee && ticket.assignee.fullname
-      ? ticket.assignee.fullname
-      : 'Unknown'
-    const HistoryItem = {
-      action: 'ticket:set:assignee',
-      description: assigneeName + ' was set as assignee',
-      owner: userId
-    }
+      const assigneeName = ticket.assignee && ticket.assignee.fullname
+        ? ticket.assignee.fullname
+        : 'Unknown'
+      const HistoryItem = {
+        action: 'ticket:set:assignee',
+        description: assigneeName + ' was set as assignee',
+        owner: userId
+      }
 
-    ticket.history.push(HistoryItem)
+      ticket.history.push(HistoryItem)
 
-    // Notify the newly assigned user (skips self-assignment). Only on an
-    // actual change so a plain re-save with the same assignee stays quiet.
-    const newAssigneeId = ticket.assignee && ticket.assignee._id ? ticket.assignee._id.toString() : null
-    if (newAssigneeId && newAssigneeId !== previousAssigneeId) {
-      await require('../../helpers/notifyAssignee')(newAssigneeId, userId, ticket)
+      // Notify the newly assigned user (skips self-assignment). Only on an
+      // actual change so a plain re-save with the same assignee stays quiet.
+      const newAssigneeId = ticket.assignee && ticket.assignee._id ? ticket.assignee._id.toString() : null
+      if (newAssigneeId && newAssigneeId !== previousAssigneeId) {
+        await require('../../helpers/notifyAssignee')(newAssigneeId, userId, ticket)
+      }
     }
   }
 
