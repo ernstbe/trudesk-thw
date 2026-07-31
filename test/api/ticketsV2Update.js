@@ -268,4 +268,105 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
     const fresh = await freshTicket()
     expect(fresh.subject).to.not.equal('should never persist')
   })
+
+  it('sets an assignee and then clears it via explicit null', async function () {
+    const userSchema = require('../../src/models/user')
+    const admin = await userSchema.getUserByUsername('trudesk')
+
+    const setRes = await put('/api/v2/tickets/' + ticketUid, { ticket: { assignee: admin._id.toString() } })
+    expect(setRes.status).to.equal(200)
+
+    const assigned = await freshTicket()
+    expect(assigned.assignee).to.exist
+    expect((assigned.assignee._id || assigned.assignee).toString()).to.equal(admin._id.toString())
+
+    // Regression: `assignee: null` used to be silently ignored by the shared
+    // update helper, so unassigning a ticket through the generic PUT (which is
+    // what both the v1 and v2 PWA clients actually send - there is no
+    // dedicated "clear assignee" call site) reported success but left the
+    // assignee untouched.
+    const clearRes = await put('/api/v2/tickets/' + ticketUid, { ticket: { assignee: null } })
+    expect(clearRes.status).to.equal(200)
+    expect(clearRes.body.success).to.be.true
+
+    const cleared = await freshTicket()
+    expect(cleared.assignee).to.not.exist
+
+    const clearEntries = cleared.history.filter(
+      h => h.action === 'ticket:set:assignee' && h.description === 'Assignee was cleared'
+    )
+    expect(clearEntries.length).to.be.at.least(1)
+  })
+
+  it('does not add a history entry when clearing an already-unassigned ticket', async function () {
+    const before = await freshTicket()
+    const entriesBefore = before.history.filter(
+      h => h.action === 'ticket:set:assignee' && h.description === 'Assignee was cleared'
+    ).length
+
+    const res = await put('/api/v2/tickets/' + ticketUid, { ticket: { assignee: null } })
+    expect(res.status).to.equal(200)
+
+    const after = await freshTicket()
+    const entriesAfter = after.history.filter(
+      h => h.action === 'ticket:set:assignee' && h.description === 'Assignee was cleared'
+    ).length
+    expect(entriesAfter).to.equal(entriesBefore)
+  })
+
+  describe('additional assignees (PUT /:uid/additional-assignees)', function () {
+    it('rejects a non-array payload', async function () {
+      const res = await put('/api/v2/tickets/' + ticketUid + '/additional-assignees', {
+        additionalAssignees: 'not-an-array'
+      })
+      expect(res.status).to.equal(400)
+    })
+
+    it('rejects invalid ids', async function () {
+      const res = await put('/api/v2/tickets/' + ticketUid + '/additional-assignees', {
+        additionalAssignees: ['not-an-objectid']
+      })
+      expect(res.status).to.equal(400)
+    })
+
+    it('returns 404 for an unknown ticket uid', async function () {
+      const res = await put('/api/v2/tickets/999999/additional-assignees', { additionalAssignees: [] })
+      expect(res.status).to.equal(404)
+    })
+
+    it('sets additional assignees, dedupes and drops the primary assignee id', async function () {
+      const userSchema = require('../../src/models/user')
+      const admin = await userSchema.getUserByUsername('trudesk')
+
+      // Give the ticket a primary assignee so the drop-primary behavior is exercised.
+      await put('/api/v2/tickets/' + ticketUid, { ticket: { assignee: admin._id.toString() } })
+
+      const res = await put('/api/v2/tickets/' + ticketUid + '/additional-assignees', {
+        additionalAssignees: [admin._id.toString(), restrictedUser._id.toString(), restrictedUser._id.toString()]
+      })
+
+      expect(res.status).to.equal(200)
+      expect(res.body.success).to.be.true
+      expect(res.body.ticket.additionalAssignees).to.be.an('array')
+      // primary assignee id is dropped, duplicate restrictedUser id is de-duped
+      expect(res.body.ticket.additionalAssignees).to.have.length(1)
+      expect(res.body.ticket.additionalAssignees[0].username).to.equal('v2update.restricted')
+
+      const fresh = await freshTicket()
+      expect(fresh.history.map(h => h.action)).to.include('ticket:set:additionalAssignees')
+
+      // Clean up so later tests in this file see a pristine fixture ticket.
+      await put('/api/v2/tickets/' + ticketUid, { ticket: { assignee: null } })
+      await put('/api/v2/tickets/' + ticketUid + '/additional-assignees', { additionalAssignees: [] })
+    })
+
+    it('rejects a user whose role lacks tickets:update with 401', async function () {
+      const res = await put(
+        '/api/v2/tickets/' + ticketUid + '/additional-assignees',
+        { additionalAssignees: [] },
+        'v2update-restricted-token'
+      )
+      expect(res.status).to.equal(401)
+    })
+  })
 })

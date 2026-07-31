@@ -71,6 +71,7 @@ module.exports = function (middleware, router, controllers) {
   router.delete('/api/v2/tickets/batch', apiv2Auth, canUser('tickets:delete'), apiv2.tickets.batchDelete)
   router.put('/api/v2/tickets/:uid', apiv2Auth, canUser('tickets:update'), apiv2.tickets.update)
   router.put('/api/v2/tickets/:uid/metadata', apiv2Auth, canUser('tickets:update'), apiv2.tickets.updateMetadata)
+  router.put('/api/v2/tickets/:uid/additional-assignees', apiv2Auth, canUser('tickets:update'), apiv2.tickets.setAdditionalAssignees)
   router.put('/api/v2/tickets/:uid/subscribe', apiv2Auth, canUser('tickets:view'), apiv2.tickets.subscribe)
   router.post('/api/v2/tickets/:uid/comments', apiv2Auth, canUser('comments:create'), apiv2.tickets.postComment)
   router.post('/api/v2/tickets/:uid/notes', apiv2Auth, canUser('tickets:notes'), apiv2.tickets.postNote)

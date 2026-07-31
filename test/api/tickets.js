@@ -313,6 +313,33 @@ describe('api/tickets.js', function () {
     expect(res.body.success).to.be.false
   })
 
+  it('should clear the assignee via PUT with explicit null (shared update helper)', async function () {
+    const userSchema = require('../../src/models/user')
+    const admin = await userSchema.getUserByUsername('trudesk')
+
+    const setRes = await api
+      .put('/api/v1/tickets/' + createdTicketId)
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ assignee: admin._id.toString() })
+    expect(setRes.status).to.equal(200)
+    expect(setRes.body.ticket.assignee).to.exist
+
+    // Regression: the generic PUT update - which is what the PWA actually
+    // calls to unassign a ticket, in both v1 and v2 mode - used to silently
+    // ignore `assignee: null`, so "clear assignee" reported success but left
+    // the ticket assigned.
+    const clearRes = await api
+      .put('/api/v1/tickets/' + createdTicketId)
+      .set('accesstoken', tdapikey)
+      .set('Content-Type', 'application/json')
+      .send({ assignee: null })
+
+    expect(clearRes.status).to.equal(200)
+    expect(clearRes.body.success).to.be.true
+    expect(clearRes.body.ticket.assignee).to.not.exist
+  })
+
   it('should delete a ticket via API', function (done) {
     api
       .delete('/api/v1/tickets/' + createdTicketId)

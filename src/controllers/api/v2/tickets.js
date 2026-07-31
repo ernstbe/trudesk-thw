@@ -340,6 +340,61 @@ ticketsV2.update = async function (req, res) {
   }
 }
 
+// Sets (replaces) the additional assignees on a ticket. Mirrors v1
+// apiTickets.setAdditionalAssignees, which was previously the only place
+// this existed - v2 clients had no way to change additional assignees
+// after ticket creation (ticketsV2.create accepts them once, at creation
+// time, and applyTicketUpdate doesn't touch the field at all).
+ticketsV2.setAdditionalAssignees = async function (req, res) {
+  const uid = req.params.uid
+  const additionalAssignees = req.body ? req.body.additionalAssignees : undefined
+  if (!uid) return apiUtils.sendApiError(res, 400, 'Invalid Parameters')
+  if (!Array.isArray(additionalAssignees)) return apiUtils.sendApiError(res, 400, 'Invalid Additional Assignees')
+
+  const mongoose = require('mongoose')
+  const allValid = additionalAssignees.every(id => mongoose.Types.ObjectId.isValid(id))
+  if (!allValid) return apiUtils.sendApiError(res, 400, 'Invalid Additional Assignees')
+
+  try {
+    const ticket = await Models.Ticket.getTicketByUid(uid)
+    if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
+
+    await assertTicketGroupVisible(req.user, ticket)
+
+    // De-duplicate and silently drop the primary assignee - primary stays primary
+    const primaryId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
+    const userIds = [...new Set(additionalAssignees.map(String))].filter(id => id !== primaryId)
+
+    const before = ticket.additionalAssignees.map(u => (u._id || u).toString())
+    const newlyAdded = userIds.filter(id => !before.includes(id))
+
+    await ticket.setAdditionalAssignees(req.user._id, userIds)
+
+    for (const id of newlyAdded) {
+      ticket.addSubscriber(id)
+    }
+
+    const saved = await ticket.save()
+    await saved.populate('additionalAssignees', 'username fullname email role image title')
+
+    const notifyAssignee = require('../../../helpers/notifyAssignee')
+    for (const id of newlyAdded) {
+      emitter.emit('ticket:subscriber:update', { user: id, subscribe: true })
+      await notifyAssignee(id, req.user._id, saved)
+    }
+
+    if (!permissions.canThis(req.user.role, 'tickets:notes')) {
+      saved.notes = []
+    }
+
+    return apiUtils.sendApiSuccess(res, { ticket: saved })
+  } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, 'Forbidden')
+    logger.warn(err)
+    return apiUtils.sendApiError(res, 500, err.message || err)
+  }
+}
+
 ticketsV2.batchUpdate = async function (req, res) {
   const batch = req.body.batch
   if (!Array.isArray(batch)) return apiUtils.sendApiError_InvalidPostData(res)
