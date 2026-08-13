@@ -51,6 +51,15 @@ const limiterConfigs = {
     points: 5,
     duration: 60 * 60,
     blockDuration: 60 * 60
+  },
+  // WebAuthn options/verify — both unauthenticated (that's the point of a
+  // passwordless login), so they're the new pre-auth attack surface.
+  // Same budget as apiLogin.
+  webauthnAuth: {
+    keyPrefix: 'webauthn_auth_per_ip',
+    points: 10,
+    duration: 60 * 15,
+    blockDuration: 60 * 15
   }
 }
 
@@ -145,5 +154,6 @@ function wrapByUser (name) {
 module.exports = {
   apiLogin: wrap('apiLogin'),
   publicRegister: wrap('publicRegister'),
-  bugReportSubmit: wrapByUser('bugReportSubmit')
+  bugReportSubmit: wrapByUser('bugReportSubmit'),
+  webauthnAuth: wrap('webauthnAuth')
 }

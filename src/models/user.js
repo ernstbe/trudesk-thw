@@ -133,6 +133,49 @@ const userSchema = mongoose.Schema({
     default: []
   },
 
+  // WebAuthn/passkey credentials. One entry per registered authenticator.
+  // `credentialId`/`publicKey` are base64url-encoded (Node's native
+  // 'base64url' Buffer encoding — no external helper needed). `counter` is
+  // the signature counter reported by the authenticator; verified /
+  // updated on every authentication to help detect cloned credentials.
+  // Dedup on `credentialId` (its natural key — cryptographically random
+  // per WebAuthn, so collisions across users are not a realistic concern;
+  // not DB-unique-indexed for the same reason accessTokens.token isn't —
+  // a unique index on a possibly-empty multikey array path collides
+  // multiple docs on a single `null` entry).
+  webauthnCredentials: {
+    type: [
+      new mongoose.Schema(
+        {
+          credentialId: { type: String, required: true },
+          publicKey: { type: String, required: true },
+          counter: { type: Number, default: 0 },
+          transports: [String],
+          deviceLabel: { type: String },
+          createdAt: { type: Date, default: Date.now },
+          lastUsedAt: { type: Date, default: Date.now }
+        },
+        { _id: false }
+      )
+    ],
+    select: false,
+    default: []
+  },
+  // Scratch field for the in-flight WebAuthn ceremony (registration OR
+  // authentication — a user can only be doing one at a time, so one field
+  // covers both instead of two). Cleared on verify; checked against
+  // `expiresAt` there too so a challenge can't be replayed after its TTL.
+  webauthnChallenge: {
+    type: new mongoose.Schema(
+      {
+        value: { type: String },
+        expiresAt: { type: Date }
+      },
+      { _id: false }
+    ),
+    select: false
+  },
+
   preferences: {
     tourCompleted: { type: Boolean, default: false },
     autoRefreshTicketGrid: { type: Boolean, default: true },
@@ -258,6 +301,56 @@ userSchema.methods.removeAccessToken = async function (token) {
   }
 
   if (dirty) await user.save()
+}
+
+/**
+ * Register a verified WebAuthn credential.
+ *
+ * @param {object} credential
+ * @param {string} credential.credentialId Base64url credential ID.
+ * @param {string} credential.publicKey Base64url COSE public key.
+ * @param {number} [credential.counter] Initial signature counter (0 if omitted).
+ * @param {string[]} [credential.transports]
+ * @param {string} [credential.deviceLabel] User-facing label ("iPhone", "Windows Hello", ...).
+ */
+userSchema.methods.addWebauthnCredential = async function (credential) {
+  const user = this
+  if (!Array.isArray(user.webauthnCredentials)) user.webauthnCredentials = []
+
+  user.webauthnCredentials.push({
+    credentialId: credential.credentialId,
+    publicKey: credential.publicKey,
+    counter: credential.counter || 0,
+    transports: credential.transports || [],
+    deviceLabel: credential.deviceLabel,
+    createdAt: new Date(),
+    lastUsedAt: new Date()
+  })
+
+  await user.save()
+}
+
+/**
+ * Remove a single WebAuthn credential by its credential ID.
+ * @param {string} credentialId
+ */
+userSchema.methods.removeWebauthnCredential = async function (credentialId) {
+  const user = this
+  if (!Array.isArray(user.webauthnCredentials) || user.webauthnCredentials.length === 0) return
+
+  const before = user.webauthnCredentials.length
+  user.webauthnCredentials = user.webauthnCredentials.filter((c) => c.credentialId !== credentialId)
+  if (user.webauthnCredentials.length !== before) await user.save()
+}
+
+/**
+ * Stash (or clear, when passed `null`) the in-flight WebAuthn challenge.
+ * @param {{value: string, expiresAt: Date}|null} challenge
+ */
+userSchema.methods.setWebauthnChallenge = async function (challenge) {
+  const user = this
+  user.webauthnChallenge = challenge || undefined
+  await user.save()
 }
 
 userSchema.methods.generateL2Auth = async function () {
@@ -513,6 +606,25 @@ userSchema.statics.getUserByAccessToken = async function (token) {
   }
 
   return user
+}
+
+/**
+ * Find the user owning a given WebAuthn credential ID. Not DB-unique-
+ * indexed (see the schema comment), but credential IDs are cryptographically
+ * random so a collision across users isn't a realistic concern in practice.
+ *
+ * @param {String} credentialId Base64url credential ID from the assertion response.
+ * @returns {Promise<User|null>}
+ */
+userSchema.statics.getUserByWebauthnCredentialId = async function (credentialId) {
+  if (!credentialId) return null
+
+  return this.model(COLLECTION)
+    .findOne(
+      { 'webauthnCredentials.credentialId': credentialId, deleted: false },
+      '+accessToken +webauthnCredentials +webauthnChallenge'
+    )
+    .exec()
 }
 
 /**

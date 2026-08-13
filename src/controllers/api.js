@@ -64,5 +64,6 @@ apiController.v2.calendar = require('./api/v2/calendar')
 apiController.v2.dashboard = require('./api/v2/dashboard')
 apiController.v2.documents = require('./api/v2/documents')
 apiController.v2.users = require('./api/v2/users')
+apiController.v2.webauthn = require('./api/v2/webauthn')
 
 module.exports = apiController
