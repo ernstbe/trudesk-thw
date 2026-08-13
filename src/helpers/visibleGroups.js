@@ -26,4 +26,22 @@ async function resolveVisibleGroups (user) {
   return groups.map(g => g._id)
 }
 
-module.exports = { resolveVisibleGroups }
+// Throws a 403-tagged error if the ticket's group is not visible to the
+// user — the same gate the single-ticket read (ticketsV2.single) applies.
+// The v2 write paths fetch a ticket by id/uid before mutating it; without
+// this guard a user holding the generic tickets:update / tickets:delete
+// grant could modify or delete a ticket in a group they cannot see (e.g.
+// Jugend touching Stab tickets). Pass `preResolved` (a string[] of group
+// ids) to reuse one lookup across a batch. Returns the resolved id list.
+async function assertTicketGroupVisible (user, ticket, preResolved) {
+  const visible = preResolved || (await resolveVisibleGroups(user)).map(g => g.toString())
+  const gid = ticket && ticket.group ? (ticket.group._id || ticket.group).toString() : null
+  if (!gid || !visible.includes(gid)) {
+    const err = new Error('Forbidden')
+    err.statusCode = 403
+    throw err
+  }
+  return visible
+}
+
+module.exports = { resolveVisibleGroups, assertTicketGroupVisible }

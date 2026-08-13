@@ -24,7 +24,7 @@ const ticketStatusSchema = require('../../../models/ticketStatus')
 const { getDeadlineStatus } = require('../../../helpers/deadlineHelper')
 const { resolveDefaultTicketStatus } = require('../../../helpers/defaultTicketStatus')
 const { parseChecklistField } = require('./checklistParser')
-const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
+const { resolveVisibleGroups, assertTicketGroupVisible } = require('../../../helpers/visibleGroups')
 
 const ticketsV2 = {}
 
@@ -1057,27 +1057,10 @@ ticketsV2.subscribe = async function (req, res) {
 }
 
 // Group visibility ("which groups may this user see") is resolved by the
-// shared helper imported at the top of this file (resolveVisibleGroups) so
-// the list, single-ticket read, calendar, dashboard and stats endpoints all
-// enforce the identical Jugend/Stab boundary.
-
-// Throws a 403-tagged error if the ticket's group is not visible to the
-// user — the same gate the single-ticket read (ticketsV2.single) applies.
-// The v2 write paths fetch a ticket by id/uid before mutating it; without
-// this guard a user holding the generic tickets:update / tickets:delete
-// grant could modify or delete a ticket in a group they cannot see (e.g.
-// Jugend touching Stab tickets). Pass `preResolved` (a string[] of group
-// ids) to reuse one lookup across a batch. Returns the resolved id list.
-async function assertTicketGroupVisible (user, ticket, preResolved) {
-  const visible = preResolved || (await resolveVisibleGroups(user)).map(g => g.toString())
-  const gid = ticket && ticket.group ? (ticket.group._id || ticket.group).toString() : null
-  if (!gid || !visible.includes(gid)) {
-    const err = new Error('Forbidden')
-    err.statusCode = 403
-    throw err
-  }
-  return visible
-}
+// shared helper imported at the top of this file (resolveVisibleGroups,
+// assertTicketGroupVisible) so the list, single-ticket read, calendar,
+// dashboard, stats and assets endpoints all enforce the identical
+// Jugend/Stab boundary.
 
 // Fetches every ticket the caller is allowed to see, applying the same
 // group gate AND the same owner restriction the ticket list uses for
