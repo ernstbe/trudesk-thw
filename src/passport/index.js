@@ -113,7 +113,12 @@ module.exports = function () {
         ignoreExpiration: false
       },
       function (jwtPayload, done) {
-        return done(null, jwtPayload.user)
+        const user = jwtPayload.user
+        // Carry the session identifier (see apiUtils.generateJWTToken) onto
+        // req.user so JWT-authenticated requests can identify "this
+        // session" the same way accesstoken-header requests do.
+        if (user && jwtPayload.sid) user._sessionToken = jwtPayload.sid
+        return done(null, user)
       }
     )
   )

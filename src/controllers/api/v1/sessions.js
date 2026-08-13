@@ -33,7 +33,11 @@ sessions.list = async function (req, res) {
     const user = await userSchema.findById(req.user._id).select('+accessToken +accessTokens').exec()
     if (!user) return res.status(404).json({ success: false, error: 'User not found' })
 
-    const currentToken = req.headers.accesstoken
+    // Under a pure-JWT auth path there's no accesstoken header, but the
+    // JWT carries the same value as a `_sessionToken` claim (see
+    // passport/index.js) — fall back to that so "this device" still
+    // resolves correctly instead of degrading to isCurrent: false.
+    const currentToken = req.headers.accesstoken || (req.user && req.user._sessionToken)
     const entries = []
 
     if (Array.isArray(user.accessTokens)) {
@@ -110,15 +114,28 @@ sessions.revoke = async function (req, res) {
  */
 sessions.revokeOthers = async function (req, res) {
   const userSchema = require('../../../models/user')
-  const currentToken = req.headers.accesstoken
-  if (!currentToken) return res.status(400).json({ success: false, error: 'No current token' })
+  // Same fallback as list(): a JWT-authenticated request has no accesstoken
+  // header, but carries the equivalent value as req.user._sessionToken.
+  const currentToken = req.headers.accesstoken || (req.user && req.user._sessionToken)
 
   try {
     const user = await userSchema.findById(req.user._id).select('+accessToken +accessTokens').exec()
     if (!user) return res.status(404).json({ success: false, error: 'User not found' })
 
+    if (!currentToken) {
+      // Can't identify which session this request is — e.g. a JWT issued
+      // before this session-token claim existed. Degrade instead of
+      // hard-failing: report success without revoking anything, rather
+      // than risk logging the caller out of the very session they're
+      // using right now by guessing wrong.
+      return res.json({ success: true, degraded: true, revokedCount: 0 })
+    }
+
+    let revokedCount = 0
     if (Array.isArray(user.accessTokens)) {
+      const before = user.accessTokens.length
       user.accessTokens = user.accessTokens.filter((t) => t.token === currentToken)
+      revokedCount += before - user.accessTokens.length
     }
 
     // Wipe the legacy single field unless that's literally what we're
@@ -126,10 +143,11 @@ sessions.revokeOthers = async function (req, res) {
     // doesn't lock themselves out mid-call.
     if (user.accessToken && user.accessToken !== currentToken) {
       user.accessToken = undefined
+      revokedCount += 1
     }
 
     await user.save()
-    return res.json({ success: true })
+    return res.json({ success: true, revokedCount })
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message })
   }

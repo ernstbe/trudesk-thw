@@ -171,10 +171,14 @@ module.exports = function (middleware, router, controllers) {
   // ── reshaping: mount the same controllers under /api/v2/* so a client
   // ── that's standardized on v2 doesn't have to mix base URLs. The
   // ── controllers read `req.user` which apiv2Auth populates the same way.
-  // ── Two known caveats live with this:
-  //  - sessions.list/revokeOthers read `req.headers.accesstoken` to flag
-  //    the current session. Under the JWT path that header is absent and
-  //    the `isCurrent` flag falls back to false — degraded but functional.
+  // ── One known caveat lives with this:
+  //  - sessions.list/revokeOthers identify "this session" via
+  //    `req.headers.accesstoken`, falling back to `req.user._sessionToken`
+  //    (a claim the jwt strategy copies from the token's `sid`, see
+  //    apiUtils.generateJWTToken) under the JWT path. Only JWTs issued
+  //    before that claim existed lack it — those degrade gracefully
+  //    (list: isCurrent false; revokeOthers: no-op success) instead of
+  //    hard-failing, and age out within one token expiry window.
   //  - The webpush + bug-report flows are header-agnostic, so they behave
   //    identically on v1 and v2.
 
