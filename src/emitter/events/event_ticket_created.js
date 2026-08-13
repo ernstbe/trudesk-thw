@@ -31,6 +31,7 @@ const socketUtils = require('../../helpers/utils')
 const sharedVars = require('../../socketio/index').shared
 const socketEvents = require('../../socketio/socketEventConsts')
 const util = require('../../helpers/utils')
+const { groupRoom } = require('../../socketio/ticketSocket')
 
 const sendSocketUpdateToUser = (user, ticket) => {
   socketUtils.sendToUser(
@@ -214,7 +215,14 @@ module.exports = async data => {
     if (ticket.group.public) await createPublicNotification(ticket)
     else await createNotification(ticket)
 
-    util.sendToAllConnectedClients(io, socketEvents.TICKETS_CREATED, ticket)
+    // Same Jugend/Stab group-room scoping as ticketSocket.js — a global
+    // broadcast here would notify every connected socket of a brand-new
+    // ticket's subject/issue, including agents outside its group.
+    if (ticket.group) {
+      util.sendToAllClientsInRoom(io, groupRoom(ticket.group), socketEvents.TICKETS_CREATED, ticket)
+    } else {
+      util.sendToAllConnectedClients(io, socketEvents.TICKETS_CREATED, ticket)
+    }
   } catch (e) {
     logger.warn(`[trudesk:events:ticket:created] - Error: ${e}`)
   }
