@@ -23,8 +23,25 @@ const socketEvents = require('../socketio/socketEventConsts')
 const notifications = require('../notifications') // Load Push Events
 const { parseMentions } = require('../helpers/mentionParser')
 const UserSchema = require('../models/user')
+const utils = require('../helpers/utils')
+const { groupRoom } = require('../socketio/ticketSocket')
 
 const eventTicketCreated = require('./events/event_ticket_created')
+
+// Same Jugend/Stab group-room scoping ticketSocket.js applies to
+// client-originated ticket events — these emitter events fire on every
+// ticket save/comment/note across v1 AND v2 controllers (this is the
+// primary fan-out path; ticketSocket.js only covers the legacy jQuery UI's
+// direct socket events) and carry full ticket content, so an unscoped
+// broadcast here leaked it just the same.
+function broadcastToTicketGroup (ticket, event, data) {
+  const gId = ticket && ticket.group
+  if (!gId) {
+    io.sockets.emit(event, data)
+    return
+  }
+  utils.sendToAllClientsInRoom(io, groupRoom(gId), event, data)
+}
 
 ;(function () {
   notifications.init(emitter)
@@ -120,7 +137,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
   }
 
   emitter.on('ticket:updated', function (ticket) {
-    io.sockets.emit('$trudesk:client:ticket:updated', { ticket })
+    broadcastToTicketGroup(ticket, '$trudesk:client:ticket:updated', { ticket })
   })
 
   emitter.on('ticket:deleted', function (oId) {
@@ -134,7 +151,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
 
   emitter.on('ticket:comment:added', async function (ticket, comment, hostname) {
     // Goes to client
-    io.sockets.emit(socketEvents.TICKETS_UPDATE, ticket)
+    broadcastToTicketGroup(ticket, socketEvents.TICKETS_UPDATE, ticket)
 
     try {
       const tpsSettings = await settingsSchema.getSettingsByName([
@@ -325,7 +342,7 @@ const eventTicketCreated = require('./events/event_ticket_created')
 
   emitter.on('ticket:note:added', function (ticket) {
     // Goes to client
-    io.sockets.emit('updateNotes', ticket)
+    broadcastToTicketGroup(ticket, 'updateNotes', ticket)
   })
 
   emitter.on('trudesk:profileImageUpdate', function (data) {

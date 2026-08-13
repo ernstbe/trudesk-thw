@@ -26,6 +26,29 @@ const xss = require('xss')
 
 const events = {}
 
+// Ticket group boundary (Jugend/Stab) for realtime fan-out. Sockets join
+// these rooms on connect (see socketserver.js#joinVisibleGroupRooms) for
+// every group resolveVisibleGroups(user) returns them, so scoping a ticket
+// event to its group's room keeps it from reaching sockets outside that
+// group — unlike the previous io.sockets.emit global broadcast, which sent
+// full ticket content (subject/issue/comments/notes) to every client.
+function groupRoom (groupId) {
+  return 'group:' + (groupId && (groupId._id || groupId)).toString()
+}
+
+// Broadcasts a ticket-scoped event to the ticket's group room only. Falls
+// back to a global broadcast if the ticket has no resolvable group (should
+// not happen for a real ticket, but fails safe rather than silently
+// dropping the event).
+function broadcastToTicketGroup (io, ticket, event, data) {
+  const groupId = ticket && ticket.group
+  if (!groupId) {
+    utils.sendToAllConnectedClients(io, event, data)
+    return
+  }
+  utils.sendToAllClientsInRoom(io, groupRoom(groupId), event, data)
+}
+
 function register (socket) {
   events.onUpdateTicketGrid(socket)
   events.onUpdateTicketStatus(socket)
@@ -65,7 +88,7 @@ events.onUpdateTicketStatus = socket => {
       ticket = await ticket.populate('status')
 
       // emitter.emit('ticket:updated', t)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_STATUS_UPDATE, {
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UI_STATUS_UPDATE, {
         tid: ticket._id,
         owner: ticket.owner,
         status: ticket.status
@@ -82,7 +105,7 @@ events.onUpdateTicket = function (socket) {
     try {
       const ticket = await ticketSchema.getTicketById(data._id)
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UPDATE, ticket)
     } catch (error) {
       // Blank
     }
@@ -135,7 +158,7 @@ events.onSetAssignee = function (socket) {
       })
 
       // emitter.emit('ticket:updated', ticket)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_ASSIGNEE_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_ASSIGNEE_UPDATE, ticket)
     } catch (err) {
       winston.warn(err)
     }
@@ -156,7 +179,7 @@ events.onSetTicketType = function (socket) {
       await ticketSchema.populate(tt, 'type')
 
       // emitter.emit('ticket:updated', tt)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_TYPE_UPDATE, tt)
+      broadcastToTicketGroup(io, tt, socketEvents.TICKETS_UI_TYPE_UPDATE, tt)
     } catch (err) {
       winston.warn(err)
     }
@@ -171,7 +194,7 @@ events.onUpdateTicketTags = socket => {
     try {
       const ticket = await ticketSchema.findOne({ _id: ticketId }).populate('tags')
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_TAGS_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UI_TAGS_UPDATE, ticket)
     } catch (e) {
       // Blank
     }
@@ -192,7 +215,7 @@ events.onSetTicketPriority = function (socket) {
       const tt = await t.save()
 
       // emitter.emit('ticket:updated', tt)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_PRIORITY_UPDATE, tt)
+      broadcastToTicketGroup(io, tt, socketEvents.TICKETS_UI_PRIORITY_UPDATE, tt)
     } catch (err) {
       winston.debug(err)
     }
@@ -209,7 +232,7 @@ events.onClearAssignee = socket => {
       const savedTicket = await updatedTicket.save()
 
       // emitter.emit('ticket:updated', tt)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_ASSIGNEE_UPDATE, savedTicket)
+      broadcastToTicketGroup(io, savedTicket, socketEvents.TICKETS_ASSIGNEE_UPDATE, savedTicket)
     } catch (e) {
       // Blank
     }
@@ -226,12 +249,18 @@ events.onSetTicketGroup = function (socket) {
 
     try {
       const ticket = await ticketSchema.getTicketById(ticketId)
+      const oldGroupId = ticket.group
       const t = await ticket.setTicketGroup(ownerId, groupId)
       const tt = await t.save()
       await ticketSchema.populate(tt, 'group')
 
       // emitter.emit('ticket:updated', tt)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_GROUP_UPDATE, tt)
+      // The ticket just moved groups: the old group's viewers need to see it
+      // drop off their list, the new group's viewers need to see it appear.
+      if (oldGroupId && oldGroupId.toString() !== tt.group._id.toString()) {
+        broadcastToTicketGroup(io, { group: oldGroupId }, socketEvents.TICKETS_UI_GROUP_UPDATE, tt)
+      }
+      broadcastToTicketGroup(io, tt, socketEvents.TICKETS_UI_GROUP_UPDATE, tt)
     } catch (err) {
       winston.warn(err)
     }
@@ -252,7 +281,7 @@ events.onSetTicketDueDate = function (socket) {
       const tt = await t.save()
 
       // emitter.emit('ticket:updated', tt)
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_DUEDATE_UPDATE, tt)
+      broadcastToTicketGroup(io, tt, socketEvents.TICKETS_UI_DUEDATE_UPDATE, tt)
     } catch (err) {
       winston.warn(err)
     }
@@ -274,7 +303,7 @@ events.onSetTicketIssue = socket => {
 
       ticket = await ticket.save()
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UPDATE, ticket)
     } catch (e) {
       // Blank
     }
@@ -304,7 +333,7 @@ events.onCommentNoteSet = socket => {
       else ticket = await ticket.updateNote(ownerId, itemId, markedText)
       ticket = await ticket.save()
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UPDATE, ticket)
     } catch (e) {
       winston.error(e)
     }
@@ -325,7 +354,7 @@ events.onRemoveCommentNote = socket => {
 
       ticket = await ticket.save()
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UPDATE, ticket)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UPDATE, ticket)
     } catch (e) {
       // Blank
     }
@@ -350,7 +379,7 @@ events.onAttachmentsUIUpdate = socket => {
         canRemoveAttachments
       }
 
-      utils.sendToAllConnectedClients(io, socketEvents.TICKETS_UI_ATTACHMENTS_UPDATE, data)
+      broadcastToTicketGroup(io, ticket, socketEvents.TICKETS_UI_ATTACHMENTS_UPDATE, data)
     } catch (e) {
       // Blank
     }
@@ -360,5 +389,6 @@ events.onAttachmentsUIUpdate = socket => {
 module.exports = {
   events,
   eventLoop,
-  register
+  register,
+  groupRoom
 }

@@ -105,6 +105,12 @@ const socketServer = function (ws) {
   // io.set('transports', ['polling', 'websocket'])
 
   io.sockets.on('connection', socket => {
+    // Ticket events carry group-scoped content (subject/issue/comments/notes)
+    // and must not reach every connected socket — join the same Jugend/Stab
+    // group rooms the REST API already scopes reads to, so ticketSocket.js
+    // can target `sendToAllClientsInRoom` instead of a global broadcast.
+    joinVisibleGroupRooms(socket).catch(err => winston.warn('Failed to join group rooms: ' + err.message))
+
     // Register Submodules
     ticketSocket.register(socket)
     chatSocket.register(socket)
@@ -143,6 +149,24 @@ function onAuthorizeSuccess (data, accept) {
   winston.debug('User successfully connected: ' + data.user.username)
 
   accept()
+}
+
+async function joinVisibleGroupRooms (socket) {
+  let user = socket.request && socket.request.user
+  if (!user) return
+
+  // resolveVisibleGroups needs role.isAdmin/isAgent — neither the
+  // session-deserialized nor the token-authenticated user has `role`
+  // populated at this point (both resolve it lazily via the global roles
+  // cache elsewhere), so populate it explicitly here.
+  if (!user.role || typeof user.role.isAdmin === 'undefined') {
+    user = await user.populate('role')
+  }
+
+  const { resolveVisibleGroups } = require('./helpers/visibleGroups')
+  const { groupRoom } = require('./socketio/ticketSocket')
+  const groups = await resolveVisibleGroups(user)
+  groups.forEach(gid => socket.join(groupRoom(gid)))
 }
 
 module.exports = socketServer
