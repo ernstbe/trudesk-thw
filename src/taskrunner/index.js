@@ -118,11 +118,20 @@ taskRunner.createTicketFromRecurringTask = async function (task) {
   }
 
   const ticket = new TicketSchema(ticketData)
+  if (task.ticketAssignee) {
+    ticket.addSubscriber(task.ticketAssignee)
+  }
+
   const saved = await ticket.save()
   await saved.populate('group owner priority')
 
   const emitter = require('../emitter')
   emitter.emit('ticket:created', { ticket: saved })
+
+  if (task.ticketAssignee) {
+    const notifyAssignee = require('../helpers/notifyAssignee')
+    await notifyAssignee(task.ticketAssignee, task.createdBy, saved)
+  }
 
   return saved
 }
