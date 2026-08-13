@@ -54,7 +54,13 @@ apiUtils.generateJWTToken = async function (dbUser) {
     return g._id
   })
 
-  const token = jwt.sign({ user: resUser }, secret, { expiresIn: expires })
+  // `sid` lets a pure-JWT request identify which session it authenticated
+  // with (same value already returned to the client as `refreshToken`),
+  // so session-management endpoints like revokeOthers can tell "this
+  // device" apart from the rest without requiring the legacy accesstoken
+  // header. See passport/index.js jwt strategy, which copies it onto
+  // req.user._sessionToken.
+  const token = jwt.sign({ user: resUser, sid: refreshToken }, secret, { expiresIn: expires })
 
   return { token, refreshToken }
 }

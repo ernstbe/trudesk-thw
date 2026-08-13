@@ -21,6 +21,30 @@ const socketEventConsts = require('../../../socketio/socketEventConsts')
 
 const apiSettings = {}
 
+// Settings follow a `namespace:key` naming convention. Keys ending in
+// `:enable` / `:port` are boolean/numeric by every existing convention
+// (mailer:enable, es:enable, maintenanceMode:enable, es:port, ...), so we
+// coerce by suffix rather than maintaining an exhaustive per-name whitelist
+// that would need updating every time a new toggle is added.
+function coerceBooleanSettingValue (value) {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['false', '0', '', 'no', 'off'].includes(normalized)) return false
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true
+  }
+  return Boolean(value)
+}
+
+function coercePortSettingValue (value) {
+  const port = Number(value)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Invalid value for port setting: ' + value)
+  }
+  return port
+}
+
 function defaultApiResponse (err, res) {
   if (err) return res.status(400).json({ success: false, error: err })
 
@@ -124,6 +148,10 @@ apiSettings.updateSetting = async function (req, res) {
         item.value = sanitizeHtml(item.value, {
           allowedTags: false
         })
+      } else if (s.name.endsWith(':enable')) {
+        item.value = coerceBooleanSettingValue(item.value)
+      } else if (s.name.endsWith(':port')) {
+        item.value = coercePortSettingValue(item.value)
       }
 
       s.value = item.value
@@ -134,7 +162,7 @@ apiSettings.updateSetting = async function (req, res) {
 
     return res.json({ success: true, updatedSettings })
   } catch (err) {
-    return res.status(400).json({ success: false, error: err })
+    return res.status(400).json({ success: false, error: err.message || String(err) })
   }
 }
 
