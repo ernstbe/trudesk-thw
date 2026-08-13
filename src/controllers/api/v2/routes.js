@@ -29,6 +29,17 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v2/token', rateLimits.apiLogin, controllers.api.v2.common.token)
   router.get('/api/v2/viewdata', middleware.loadCommonData, controllers.api.v2.common.viewData)
 
+  // WebAuthn/passkey (#205). register/* and the credential list/delete
+  // require an existing session; auth/* is deliberately unauthenticated —
+  // that's the whole point of a passwordless login — so it's IP rate
+  // limited like /login instead.
+  router.post('/api/v2/webauthn/register/options', apiv2Auth, apiv2.webauthn.registrationOptions)
+  router.post('/api/v2/webauthn/register/verify', apiv2Auth, apiv2.webauthn.registrationVerify)
+  router.get('/api/v2/webauthn/credentials', apiv2Auth, apiv2.webauthn.listCredentials)
+  router.delete('/api/v2/webauthn/credentials/:credentialId', apiv2Auth, apiv2.webauthn.removeCredential)
+  router.post('/api/v2/webauthn/auth/options', rateLimits.webauthnAuth, apiv2.webauthn.authenticationOptions)
+  router.post('/api/v2/webauthn/auth/verify', rateLimits.webauthnAuth, apiv2.webauthn.authenticationVerify)
+
   // Accounts
   router.get('/api/v2/accounts', apiv2Auth, canUser('accounts:view'), apiv2.accounts.get)
   router.post('/api/v2/accounts', apiv2Auth, canUser('accounts:create'), apiv2.accounts.create)
