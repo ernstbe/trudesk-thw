@@ -210,6 +210,7 @@ backupRestore.uploadBackup = function (req, res) {
 
   const object = {}
   let error
+  let writeDone = Promise.resolve()
 
   busboy.on('file', function (name, file, info) {
     const filename = info.filename
@@ -243,19 +244,39 @@ backupRestore.uploadBackup = function (req, res) {
     const savePath = path.join(__dirname, '../../backups')
     fs.ensureDirSync(savePath)
 
-    object.filePath = path.join(savePath, filename)
-    object.filename = filename.replace('/', '').replace('..', '')
+    // basename() first: filename came from the multipart part unfiltered,
+    // and the write target must be built from the SAME sanitized value used
+    // for object.filename below — a raw '..\\..\\public\\uploads\\x.zip'
+    // wrote outside backups/ because filePath used to be joined from the
+    // untouched string while only the separate .filename field was cleaned.
+    const safeFilename = path.basename(filename)
+    object.filePath = path.join(savePath, safeFilename)
+    object.filename = safeFilename
     object.mimetype = mimetype
 
-    file.pipe(fs.createWriteStream(object.filePath))
+    // busboy's 'finish' only means the request body has been fully read —
+    // it fires as soon as this stream is piped, independent of whether the
+    // write to disk has actually completed. Track the write stream's own
+    // completion so 'finish' below doesn't check fs.existsSync before the
+    // file is actually there (a race that's rare on a small local upload
+    // but real, and got hit by the very traversal-filename test that
+    // verifies this fix).
+    const writeStream = fs.createWriteStream(object.filePath)
+    writeDone = new Promise(function (resolve) {
+      writeStream.on('finish', resolve)
+      writeStream.on('error', resolve)
+    })
+    file.pipe(writeStream)
   })
 
-  busboy.on('finish', function () {
+  busboy.on('finish', async function () {
     if (error) return res.status(error.status || 500).json({ success: false, error: error.message })
 
     if (object.filePath === undefined || object.filename === undefined) {
       return res.status(400).json({ success: false, error: 'Invalid Form Data' })
     }
+
+    await writeDone
 
     if (!fs.existsSync(object.filePath)) { return res.status(400).json({ success: false, error: 'File failed to save to disk' }) }
 
