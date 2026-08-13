@@ -2,6 +2,7 @@ const Asset = require('../../../models/asset')
 const Ticket = require('../../../models/ticket')
 const apiUtil = require('../apiUtils')
 const pdfGenerator = require('../../../helpers/pdfGenerator')
+const { assertTicketGroupVisible } = require('../../../helpers/visibleGroups')
 
 const assetsApi = {}
 
@@ -109,6 +110,11 @@ assetsApi.linkTicket = async function (req, res) {
     const ticket = await Ticket.getTicketByUid(ticketUid)
     if (!ticket) return apiUtil.sendApiError(res, 404, 'Ticket not found')
 
+    // Same Jugend/Stab group gate the ticket write paths apply (see
+    // ticketsV2.update) — without it a caller could link an asset to (and
+    // silently write into) a ticket outside their visible groups.
+    await assertTicketGroupVisible(req.user, ticket)
+
     // Link asset to ticket metadata
     if (!ticket.metadata) ticket.metadata = {}
     ticket.metadata.assetId = assetId
@@ -124,6 +130,7 @@ assetsApi.linkTicket = async function (req, res) {
     asset = await Asset.getById(assetId)
     return apiUtil.sendApiSuccess(res, { asset })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtil.sendApiError(res, 403, err.message)
     return apiUtil.sendApiError(res, 500, err.message)
   }
 }
