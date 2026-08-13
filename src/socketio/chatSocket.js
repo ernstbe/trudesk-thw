@@ -334,6 +334,10 @@ events.saveChatWindow = function (socket) {
 
 events.onChatMessage = function (socket) {
   socket.on(socketEventConst.MESSAGES_SEND, async function (data) {
+    if (!data || !data.message || !data.message.owner || !data.message.owner._id) {
+      return utils.sendToSelf(socket, socketEventConst.MESSAGES_UI_RECEIVE, { message: 'Invalid chat message payload' })
+    }
+
     const to = data.to
     const from = data.from
 
@@ -402,6 +406,8 @@ events.onChatMessage = function (socket) {
 
 events.onChatTyping = function (socket) {
   socket.on(socketEventConst.MESSAGES_USER_TYPING, function (data) {
+    if (!data) return
+
     const to = data.to
     const from = data.from
 
@@ -437,6 +443,8 @@ events.onChatTyping = function (socket) {
 
 events.onChatStopTyping = function (socket) {
   socket.on(socketEventConst.MESSAGES_USER_STOP_TYPING, function (data) {
+    if (!data) return
+
     const to = data.to
     let user = null
 
