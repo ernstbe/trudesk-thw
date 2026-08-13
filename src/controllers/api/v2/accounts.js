@@ -170,6 +170,24 @@ accountsApi.exportMyData = async (req, res) => {
   }
 }
 
+// #privatetickets — idempotent "enable private ticket space" for the
+// Settings toggle. No extra grant needed: every authenticated user may
+// create their OWN hidden group.
+accountsApi.enablePrivateGroup = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+
+  try {
+    const dbUser = await User.findOne({ _id: req.user._id })
+    if (!dbUser || dbUser.deleted) return apiUtil.sendApiError(res, 400, 'Invalid User')
+
+    const group = await Group.getOrCreatePrivateGroup(dbUser)
+    return apiUtil.sendApiSuccess(res, { group })
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
 accountsApi.create = async function (req, res) {
   const postData = req.body
   if (!postData) return apiUtil.sendApiError_InvalidPostData(res)

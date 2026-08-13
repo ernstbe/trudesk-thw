@@ -14,6 +14,7 @@
 
 const GroupSchema = require('../../../models/group')
 const ticketSchema = require('../../../models/ticket')
+const { mergeOwnPrivateGroup } = require('../../../helpers/visibleGroups')
 
 const apiGroups = {}
 
@@ -50,6 +51,7 @@ apiGroups.get = async function (req, res) {
         })
       }
 
+      groups = await mergeOwnPrivateGroup(groups, user._id)
       return res.json({ success: true, groups })
     } else {
       groups = await GroupSchema.getAllGroupsOfUser(user._id)
@@ -57,6 +59,7 @@ apiGroups.get = async function (req, res) {
         const publicGroups = await GroupSchema.getAllPublicGroups()
         groups = groups.concat(publicGroups)
       }
+      groups = await mergeOwnPrivateGroup(groups, user._id)
       return res.json({ success: true, groups })
     }
   } catch (err) {

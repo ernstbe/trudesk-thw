@@ -475,7 +475,9 @@ ticketsController.single = async function (req, res) {
     } else {
       const departments = await departmentSchema.getUserDepartments(req.user._id)
       if (departments.some(d => d.allGroups === true)) {
-        userGroups = await groupSchema.find({})
+        // getAllGroupsNoPopulate excludes private (#privatetickets) groups —
+        // a raw find({}) here would sweep in every user's hidden group.
+        userGroups = await groupSchema.getAllGroupsNoPopulate()
       } else {
         userGroups = departments.map(function (d) {
           return d.groups

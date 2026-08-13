@@ -85,17 +85,9 @@ ticketsV2.create = async function (req, res) {
     if (!user || user.deleted) return apiUtils.sendApiError(res, 400, 'Invalid User')
 
     // Verify the user is actually allowed to file into the requested group.
-    // Mirrors the visibility logic used by ticketsV2.single and accountsApi.sessionUser:
-    // admins/agents see groups reachable via their team→department mapping, everyone
-    // else only sees groups they are a direct member of.
-    let allowedGroupIds
-    if (req.user.role.isAdmin || req.user.role.isAgent) {
-      const dbGroups = await Models.Department.getDepartmentGroupsOfUser(req.user._id)
-      allowedGroupIds = dbGroups.map(g => g._id.toString())
-    } else {
-      const dbGroups = await Models.Group.getAllGroupsOfUser(req.user._id)
-      allowedGroupIds = dbGroups.map(g => g._id.toString())
-    }
+    // Mirrors the visibility logic used by ticketsV2.single and accountsApi.sessionUser
+    // (and, via resolveVisibleGroups, includes the caller's own #privatetickets group).
+    const allowedGroupIds = (await resolveVisibleGroups(req.user)).map(id => id.toString())
     if (!allowedGroupIds.includes(postData.group.toString())) {
       return apiUtils.sendApiError(res, 403, 'Forbidden: group not accessible to this user')
     }
