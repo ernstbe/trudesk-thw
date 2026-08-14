@@ -27,6 +27,7 @@ const COLLECTION = 'groups'
  * @property {String} name ```Required``` ```unique``` Name of Group
  * @property {Array} members Members in this group
  * @property {Array} sendMailTo Members to email when a new / updated ticket has triggered
+ * @property {Boolean} private Hidden single-member "private tickets" group (#privatetickets)
  */
 const groupSchema = mongoose.Schema({
   name: { type: String, required: true, unique: true },
@@ -38,7 +39,16 @@ const groupSchema = mongoose.Schema({
     }
   ],
   sendMailTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'accounts' }],
-  public: { type: Boolean, required: true, default: false }
+  public: { type: Boolean, required: true, default: false },
+  // Unrelated to `public` above (that WIDENS visibility to tickets:public
+  // holders). `private` marks a hidden, single-member group auto-created
+  // per user for tickets only they can see — excluded from every "list all
+  // groups" static below so it never surfaces in another user's dropdown
+  // or admin group list. Not to be confused with the OTHER existing
+  // per-user group convention: createPublicAccount/pubNewIssue auto-create
+  // a `{ name: email, public: true }` group for self-registered users —
+  // that one is deliberately visible to staff, the opposite direction.
+  private: { type: Boolean, default: false }
 })
 
 groupSchema.plugin(require('mongoose-autopopulate'))
@@ -126,6 +136,8 @@ groupSchema.statics.getWithObject = async function (obj) {
   const userId = obj.userId
 
   if (userId) {
+    // Membership-scoped — the private group's own owner IS a member, so it
+    // stays included here without a special case.
     return this.model(COLLECTION)
       .find({ members: userId })
       .limit(limit)
@@ -137,7 +149,7 @@ groupSchema.statics.getWithObject = async function (obj) {
   }
 
   return this.model(COLLECTION)
-    .find({})
+    .find({ private: { $ne: true } })
     .limit(limit)
     .skip(page * limit)
     .populate('members', '_id username fullname email role preferences image title deleted')
@@ -146,9 +158,14 @@ groupSchema.statics.getWithObject = async function (obj) {
     .exec()
 }
 
+// "List every group" — excludes private groups (mirrors the deleted:false
+// convention on user/ticket/comment/note). This is the single highest-
+// leverage fix for #privatetickets: Department.getDepartmentGroupsOfUser's
+// allGroups:true branch calls this directly, so an admin/agent whose
+// department sees "all groups" never sweeps in anyone's private group.
 groupSchema.statics.getAllGroups = async function () {
   const q = this.model(COLLECTION)
-    .find({})
+    .find({ private: { $ne: true } })
     .populate('members', '_id username fullname email role preferences image title deleted')
     .populate('sendMailTo', '_id username fullname email role preferences image title deleted')
     .sort('name')
@@ -158,7 +175,7 @@ groupSchema.statics.getAllGroups = async function () {
 
 groupSchema.statics.getAllGroupsNoPopulate = async function () {
   const q = this.model(COLLECTION)
-    .find({})
+    .find({ private: { $ne: true } })
     .sort('name')
 
   return q.exec()
@@ -206,6 +223,36 @@ groupSchema.statics.getAllGroupsOfUserNoPopulate = async function (userId) {
     .sort('name')
 
   return q.exec()
+}
+
+// #privatetickets — the caller's own hidden group, if they've enabled the
+// feature. Deliberately NOT populated: callers that need it just need the
+// _id to merge into a visible-groups list.
+groupSchema.statics.getOwnPrivateGroup = async function (userId) {
+  if (userId === undefined) throw new Error('Invalid UserId - GroupSchema.GetOwnPrivateGroup()')
+
+  return this.model(COLLECTION)
+    .findOne({ private: true, members: userId })
+    .exec()
+}
+
+// Idempotent: returns the existing private group if the user already has
+// one (Settings toggle can be flipped on repeatedly without duplicating
+// it), otherwise creates one. `sendMailTo` stays empty — the owner already
+// gets normal notifications as the ticket's owner/subscriber, no group-
+// level mail fan-out needed for a group with exactly one member.
+groupSchema.statics.getOrCreatePrivateGroup = async function (user) {
+  if (!user || !user._id) throw new Error('Invalid User - GroupSchema.GetOrCreatePrivateGroup()')
+
+  const existing = await this.model(COLLECTION).getOwnPrivateGroup(user._id)
+  if (existing) return existing
+
+  return this.model(COLLECTION).create({
+    name: 'private:' + user._id.toString(),
+    members: [user._id],
+    sendMailTo: [],
+    private: true
+  })
 }
 
 groupSchema.statics.getGroupById = async function (gId) {

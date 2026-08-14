@@ -1,6 +1,8 @@
 const expect = require('chai').expect
 const m = require('mongoose')
 const groupSchema = require('../../src/models/group')
+const userSchema = require('../../src/models/user')
+const roleSchema = require('../../src/models/role')
 
 describe('group.js', function () {
   const groupId = new m.Types.ObjectId()
@@ -51,5 +53,56 @@ describe('group.js', function () {
     group.members = [mem]
     const success = await group.removeMember(memberId2)
     expect(success).to.equal(true)
+  })
+
+  describe('#privatetickets', function () {
+    // Group.members refs 'accounts' with autopopulate-on-save — populating a
+    // member id with no matching account document leaves it null, so this
+    // needs a real persisted user rather than a bare ObjectId.
+    let owner
+    let ownerId
+
+    before(async function () {
+      const userRole = (await roleSchema.getRoles()).find(r => r.normalized === 'user')
+      owner = await userSchema.create({
+        username: 'group.privatetickets.owner',
+        password: '$2a$04$350Dkwcq9EpJLFhbeLB0buFcyFkI9q3edQEPpy/zqLjROMD9LPToW',
+        fullname: 'Group Private Tickets Owner',
+        email: 'group.privatetickets.owner@trudesk.io',
+        role: userRole._id,
+        accessToken: 'group-privatetickets-owner-token'
+      })
+      ownerId = owner._id
+    })
+
+    after(async function () {
+      await groupSchema.deleteMany({ private: true, members: ownerId })
+      if (owner) await userSchema.deleteOne({ _id: owner._id })
+    })
+
+    it('should create a private group on first call', async function () {
+      const group = await groupSchema.getOrCreatePrivateGroup({ _id: ownerId })
+      expect(group).to.be.a('object')
+      expect(group.private).to.equal(true)
+      expect(group.members.map(id => (id._id || id).toString())).to.include(ownerId.toString())
+    })
+
+    it('should return the same private group on subsequent calls (idempotent)', async function () {
+      const first = await groupSchema.getOrCreatePrivateGroup({ _id: ownerId })
+      const second = await groupSchema.getOrCreatePrivateGroup({ _id: ownerId })
+      expect(second._id.toString()).to.equal(first._id.toString())
+    })
+
+    it('getOwnPrivateGroup should find the owner private group', async function () {
+      const group = await groupSchema.getOwnPrivateGroup(ownerId)
+      expect(group).to.be.a('object')
+      expect(group.private).to.equal(true)
+    })
+
+    it('should exclude private groups from getAllGroups', async function () {
+      const groups = await groupSchema.getAllGroups()
+      const privateIncluded = groups.some(g => g.private === true)
+      expect(privateIncluded).to.equal(false)
+    })
   })
 })

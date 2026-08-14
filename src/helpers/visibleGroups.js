@@ -23,7 +23,21 @@ async function resolveVisibleGroups (user) {
   } else {
     groups = await Group.getAllGroupsOfUser(user._id)
   }
-  return groups.map(g => g._id)
+  const ids = groups.map(g => g._id)
+
+  // #privatetickets — Group.getAllGroups()/Department.getDepartmentGroupsOfUser's
+  // allGroups branch now excludes private groups entirely (so they never leak
+  // to OTHER users), which means the admin/agent branch above never picks up
+  // the caller's OWN private group either (it isn't mapped to any department).
+  // The membership branch already includes it naturally, but merge
+  // unconditionally here so both paths behave identically and a private
+  // group is exactly as visible to its owner as any other group they belong to.
+  const ownPrivate = await Group.getOwnPrivateGroup(user._id)
+  if (ownPrivate && !ids.some(id => id.toString() === ownPrivate._id.toString())) {
+    ids.push(ownPrivate._id)
+  }
+
+  return ids
 }
 
 // Throws a 403-tagged error if the ticket's group is not visible to the
@@ -44,4 +58,16 @@ async function assertTicketGroupVisible (user, ticket, preResolved) {
   return visible
 }
 
-module.exports = { resolveVisibleGroups, assertTicketGroupVisible }
+// #privatetickets — merges the caller's own private group into a group-LIST
+// response if it isn't already present. resolveVisibleGroups above governs
+// ticket AUTHORIZATION; this governs what a group picker/dropdown DISPLAYS
+// (GET /groups, v1 and v2) — a separate code path that needs the same fix
+// so the private group actually shows up for its owner to pick.
+async function mergeOwnPrivateGroup (groups, userId) {
+  const ownPrivate = await Group.getOwnPrivateGroup(userId)
+  if (!ownPrivate) return groups
+  const alreadyIncluded = groups.some(g => g._id.toString() === ownPrivate._id.toString())
+  return alreadyIncluded ? groups : groups.concat(ownPrivate)
+}
+
+module.exports = { resolveVisibleGroups, assertTicketGroupVisible, mergeOwnPrivateGroup }

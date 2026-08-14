@@ -762,7 +762,9 @@ ticketSchema.statics.getTicketsByDepartments = async function (departments, obje
   if (!departments || !(typeof departments === 'object' && departments !== null) || !object) { throw new Error('Invalid Data - TicketSchema.GetTicketsByDepartments()') }
 
   if (departments.some(d => d.allGroups === true)) {
-    const groups = await groupSchema.find({})
+    // getAllGroupsNoPopulate excludes private (#privatetickets) groups —
+    // a raw find({}) here would sweep in every user's hidden group.
+    const groups = await groupSchema.getAllGroupsNoPopulate()
     return this.getTicketsWithObject(groups, object)
   } else {
     const groups = departments.map(function (d) {

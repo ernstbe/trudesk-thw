@@ -16,6 +16,7 @@ const apiUtils = require('../apiUtils')
 const Ticket = require('../../../models/ticket')
 const Group = require('../../../models/group')
 const Department = require('../../../models/department')
+const { mergeOwnPrivateGroup } = require('../../../helpers/visibleGroups')
 
 const apiGroups = {}
 
@@ -49,16 +50,18 @@ apiGroups.get = async function (req, res) {
 
   try {
     if (type === 'all') {
-      const groups = await Group.getWithObject({ limit, page })
+      let groups = await Group.getWithObject({ limit, page })
+      groups = await mergeOwnPrivateGroup(groups, req.user._id)
       return apiUtils.sendApiSuccess(res, { groups, count: groups.length })
     } else {
+      let groups
       if (req.user.role.isAdmin || req.user.role.isAgent) {
-        const groups = await Department.getDepartmentGroupsOfUser(req.user._id)
-        return apiUtils.sendApiSuccess(res, { groups, count: groups.length })
+        groups = await Department.getDepartmentGroupsOfUser(req.user._id)
       } else {
-        const groups = await Group.getAllGroupsOfUser(req.user._id)
-        return apiUtils.sendApiSuccess(res, { groups, count: groups.length })
+        groups = await Group.getAllGroupsOfUser(req.user._id)
       }
+      groups = await mergeOwnPrivateGroup(groups, req.user._id)
+      return apiUtils.sendApiSuccess(res, { groups, count: groups.length })
     }
   } catch (err) {
     return apiUtils.sendApiError(res, 500, err.message)
