@@ -78,6 +78,6 @@ React components mount into server-rendered Handlebars pages via container divs 
 
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, etc.) — enforced by commitlint + husky.
 - Code style: StandardJS + Prettier (120 char width, single quotes).
-- Package manager: Yarn 3.2.1 (`packageManager` field in package.json).
+- Package manager: npm 10.9.4 (`packageManager` field in package.json); `package-lock.json` is the lockfile.
 - Node.js >= 22.0.0 required.
 - React components have been migrated from class components to functional components with hooks.
