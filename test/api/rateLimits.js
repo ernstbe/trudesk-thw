@@ -21,7 +21,9 @@ describe('middleware/rateLimits', function () {
   })
 
   after(function () {
-    process.env.NODE_ENV = originalEnv
+    // Assigning undefined to process.env stores the string "undefined".
+    if (originalEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalEnv
     // Restore the cached pass-through version for the rest of the suite.
     delete require.cache[require.resolve('../../src/middleware/rateLimits')]
     require('../../src/middleware/rateLimits')

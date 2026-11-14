@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node ./app",
     "build": "grunt build",
-    "test": "mocha --recursive",
+    "test": "cross-env NODE_ENV=test mocha --recursive",
     "lint": "eslint .",
     "format": "eslint . --fix",
     "coverage": "nyc --reporter=lcovonly npm run test",
