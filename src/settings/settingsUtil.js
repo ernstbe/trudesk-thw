@@ -94,6 +94,20 @@ util.getSettings = async callback => {
         s.mailerPassword = parseSetting(settings, 'mailer:password', '')
         s.mailerFrom = parseSetting(settings, 'mailer:from', '')
 
+        // SMTP_* in the environment overrides the database settings (see
+        // src/mailer). Show what is in effect, never the password.
+        const envMail = require('../mailer').envConfig()
+        s.mailerEnvManaged = { value: !!envMail }
+        if (envMail) {
+          s.mailerEnabled = { value: true }
+          s.mailerHost = { value: envMail.host }
+          s.mailerSSL = { value: envMail.secure }
+          s.mailerPort = { value: envMail.port }
+          s.mailerUsername = { value: envMail.user }
+          s.mailerPassword = { value: '' }
+          s.mailerFrom = { value: envMail.from }
+        }
+
         s.mailerCheckEnabled = parseSetting(settings, 'mailer:check:enable', false)
         s.mailerCheckPolling = parseSetting(settings, 'mailer:check:polling', 600000)
         s.mailerCheckHost = parseSetting(settings, 'mailer:check:host', '')

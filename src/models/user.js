@@ -827,20 +827,16 @@ userSchema.statics.createUserFromEmail = async function (email) {
   const userRoleDefault = await settingSchema.getSetting('role:user:default')
   if (!userRoleDefault) throw new Error('Invalid Setting - UserRoleDefault')
 
-  const Chance = require('chance')
-
-  const chance = new Chance()
-
-  const plainTextPass = chance.string({
-    length: 6,
-    pool: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'
-  })
+  // #invite: no password is generated or mailed in plain text. The account
+  // gets an unusable random password and a 7-day invitation link instead.
+  const crypto = require('crypto')
+  const accountTokens = require('../helpers/accountTokens')
 
   // eslint-disable-next-line new-cap
   const user = new self({
     username: email,
     email,
-    password: plainTextPass,
+    password: crypto.randomBytes(48).toString('base64'),
     fullname: email,
     role: userRoleDefault.value
   })
@@ -848,6 +844,7 @@ userSchema.statics.createUserFromEmail = async function (email) {
   const items = await self.model(COLLECTION).find({ username: user.username })
   if (items.length > 0) throw new Error('Username already exists')
 
+  const invite = await accountTokens.issueInvite(user)
   const savedUser = await user.save()
 
   // Create a group for this user
@@ -861,50 +858,14 @@ userSchema.statics.createUserFromEmail = async function (email) {
 
   const savedGroup = await group.save()
 
-  // Send welcome email
-  const path = require('path')
-  const mailer = require('../mailer')
-  const Email = require('email-templates')
-  const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
-
-  const emailRenderer = new Email({
-    views: {
-      root: templateDir,
-      options: {
-        extension: 'handlebars'
-      }
-    }
-  })
-
-  const settingSchema2 = require('./setting')
-  const setting = await settingSchema2.getSetting('gen:siteurl')
-
-  const siteUrl = setting ? setting.value : ''
-
-  const dataObject = {
+  // A failed invite mail must not drop the incoming ticket; an admin can
+  // resend the invitation from the accounts list.
+  await accountTokens.sendLinkMail({
     user: savedUser,
-    username: savedUser.username,
-    fullname: savedUser.fullname,
-    plainTextPassword: plainTextPass,
-    baseUrl: siteUrl
-  }
-
-  const html = await emailRenderer.render('public-account-created', dataObject)
-  const mailOptions = {
-    to: savedUser.email,
-    subject: require('../i18n').t('welcomeAccount', { siteTitle: 'Trudesk' }),
-    html,
-    generateTextFromHTML: true
-  }
-
-  await new Promise((resolve, reject) => {
-    mailer.sendMail(mailOptions, function (err) {
-      if (err) {
-        winston.warn(err)
-        return reject(err)
-      }
-      return resolve()
-    })
+    template: 'invite',
+    subjectKey: 'accountInvite',
+    url: invite.url,
+    expires: invite.expires
   })
 
   return { user: savedUser, group: savedGroup }

@@ -265,4 +265,23 @@ describe('invitation and password-reset links (#invite)', function () {
     const v2 = await call('post', '/api/v2/login', { body: { username: 'invite.deleted', password: goodPassword } })
     expect(v2.status).to.equal(401)
   })
+
+  it('invites accounts created from incoming mail instead of mailing a password', async function () {
+    const settingSchema = require('../../src/models/setting')
+    const groupSchema = require('../../src/models/group')
+    const hadRole = await settingSchema.getSetting('role:user:default')
+    if (!hadRole) await settingSchema.create({ name: 'role:user:default', value: global.userRoleId })
+    try {
+      const { user, group } = await userSchema.createUserFromEmail('invite.frommail@trudesk.io')
+      createdIds.push(user._id)
+      await groupSchema.deleteOne({ _id: group._id })
+
+      const stored = await userSchema.findById(user._id).select('+inviteTokenHash +inviteExpire')
+      expect(stored.invitePending).to.equal(true)
+      expect(stored.inviteTokenHash).to.match(/^[0-9a-f]{64}$/)
+      expect(stored.inviteExpire.getTime()).to.be.greaterThan(Date.now() + accountTokens.INVITE_TTL_MS - 60000)
+    } finally {
+      if (!hadRole) await settingSchema.deleteOne({ name: 'role:user:default' })
+    }
+  })
 })

@@ -54,54 +54,96 @@ mailer.verify = function (callback) {
   })
 }
 
-function createTransporter (callback) {
-  // Setting.getSettings is promise-based and ignores a callback argument;
-  // passing one (as this code used to) meant sendMail never called back.
-  settings.getSettings().then(function (s) { buildTransporter(s, callback) }, callback)
+/**
+ * SMTP configuration from the environment (deploy/.env). When SMTP_HOST is
+ * set it replaces the mailer:* settings from the database entirely, so the
+ * SMTP password never has to be stored in MongoDB (or its backups).
+ *
+ *   SMTP_HOST    required to activate, e.g. mail.your-server.de
+ *   SMTP_PORT    default 587 (465 when SMTP_SECURE=true)
+ *   SMTP_SECURE  "true" for implicit TLS (port 465); otherwise STARTTLS is
+ *                required, so credentials never travel in plain text
+ *   SMTP_USER    / SMTP_PASS   login
+ *   SMTP_FROM    sender, default SMTP_USER
+ *
+ * @returns {null|{ host: string, port: number, secure: boolean, user: string, pass: string, from: string }}
+ */
+mailer.envConfig = function (env = process.env) {
+  const host = (env.SMTP_HOST || '').trim()
+  if (!host) return null
+  const secure = String(env.SMTP_SECURE || '').toLowerCase() === 'true'
+  const port = parseInt(env.SMTP_PORT, 10) || (secure ? 465 : 587)
+  const user = (env.SMTP_USER || '').trim()
+  return {
+    host,
+    port,
+    secure,
+    user,
+    pass: env.SMTP_PASS || '',
+    from: (env.SMTP_FROM || '').trim() || user
+  }
 }
 
-function buildTransporter (s, callback) {
-  const mailSettings = {}
-  mailSettings.enabled = s.find(function (x) {
-    return x.name === 'mailer:enable'
-  })
-  mailSettings.host = s.find(function (x) {
-    return x.name === 'mailer:host'
-  })
-  mailSettings.ssl = s.find(function (x) {
-    return x.name === 'mailer:ssl'
-  })
-  mailSettings.port = s.find(function (x) {
-    return x.name === 'mailer:port'
-  })
-  mailSettings.username = s.find(function (x) {
-    return x.name === 'mailer:username'
-  })
-  mailSettings.password = s.find(function (x) {
-    return x.name === 'mailer:password'
-  })
-  mailSettings.from = s.find(function (x) {
-    return x.name === 'mailer:from'
-  })
-
-  mailSettings.enabled = mailSettings.enabled && mailSettings.enabled.value ? mailSettings.enabled.value : false
-
+/**
+ * nodemailer transport options. TLS certificates are always verified.
+ * @param {{ host: string, port: number|string, secure: boolean, user?: string, pass?: string }} c
+ * @param {boolean} requireTLS refuse to send when the server offers no STARTTLS
+ */
+mailer.transportOptions = function (c, requireTLS) {
   const transport = {
-    host: mailSettings.host && mailSettings.host.value ? mailSettings.host.value : '127.0.0.1',
-    port: mailSettings.port && mailSettings.port.value ? mailSettings.port.value : 25,
-    secure: mailSettings.ssl && mailSettings.ssl.value ? mailSettings.ssl.value : false,
-    tls: {
-      rejectUnauthorized: false
-    }
+    host: c.host || '127.0.0.1',
+    port: c.port || 25,
+    secure: !!c.secure,
+    requireTLS: !c.secure && !!requireTLS
   }
-  if (mailSettings.username && mailSettings.username.value) {
-    transport.auth = {
-      user: mailSettings.username.value,
-      pass: mailSettings.password && mailSettings.password.value ? mailSettings.password.value : ''
-    }
+  if (c.user) transport.auth = { user: c.user, pass: c.pass || '' }
+  return transport
+}
+
+function createTransporter (callback) {
+  const env = mailer.envConfig()
+  if (env) {
+    return finish(callback, {
+      enabled: true,
+      from: { value: env.from },
+      transport: mailer.transportOptions(env, true)
+    })
   }
 
-  mailSettings.transporter = nodeMailer.createTransport(transport)
+  // Setting.getSettings is promise-based and ignores a callback argument;
+  // passing one (as this code used to) meant sendMail never called back.
+  settings.getSettings().then(function (s) { buildFromSettings(s, callback) }, callback)
+}
+
+function buildFromSettings (s, callback) {
+  const value = function (name) {
+    const setting = s.find(function (x) {
+      return x.name === name
+    })
+    return setting ? setting.value : undefined
+  }
+
+  return finish(callback, {
+    enabled: value('mailer:enable') || false,
+    from: s.find(function (x) {
+      return x.name === 'mailer:from'
+    }),
+    transport: mailer.transportOptions(
+      {
+        host: value('mailer:host'),
+        port: value('mailer:port'),
+        secure: value('mailer:ssl'),
+        user: value('mailer:username'),
+        pass: value('mailer:password')
+      },
+      false
+    )
+  })
+}
+
+function finish (callback, mailSettings) {
+  mailSettings.transporter = nodeMailer.createTransport(mailSettings.transport)
+  delete mailSettings.transport
   mailer.transporter = mailSettings.transporter
 
   return callback(null, mailSettings)
