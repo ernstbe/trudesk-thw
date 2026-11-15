@@ -64,8 +64,8 @@ describe('ticket notification e-mails', function () {
   }
 
   describe('preferences', function () {
-    it('default to personal on, new tickets off', function () {
-      expect(notificationMail.emailPrefs({})).to.deep.equal({ personal: true, newTickets: false })
+    it('are off by default (opt-in)', function () {
+      expect(notificationMail.emailPrefs({})).to.deep.equal({ personal: false, newTickets: false })
     })
 
     it('decide per kind', function () {
@@ -76,10 +76,10 @@ describe('ticket notification e-mails', function () {
     })
 
     it('never mail without kind, ticket, address, or for deleted and pending accounts', function () {
-      const u = { email: 'a@b.c' }
+      const u = { email: 'a@b.c', preferences: { emailNotifications: { personal: true } } }
       expect(notificationMail.mailKindFor(notification(undefined), u)).to.equal(null)
       expect(notificationMail.mailKindFor({ mailKind: 'comment', data: {} }, u)).to.equal(null)
-      expect(notificationMail.mailKindFor(notification('comment'), {})).to.equal(null)
+      expect(notificationMail.mailKindFor(notification('comment'), { preferences: u.preferences })).to.equal(null)
       expect(notificationMail.mailKindFor(notification('comment'), { ...u, deleted: true })).to.equal(null)
       expect(notificationMail.mailKindFor(notification('comment'), { ...u, invitePending: true })).to.equal(null)
       expect(notificationMail.mailKindFor(notification('comment'), u)).to.not.equal(null)
@@ -87,7 +87,14 @@ describe('ticket notification e-mails', function () {
   })
 
   describe('sending', function () {
+    const optIn = () => userSchema.updateOne({ _id: user._id }, { $set: { 'preferences.emailNotifications.personal': true } })
+
+    afterEach(async function () {
+      await userSchema.updateOne({ _id: user._id }, { $unset: { 'preferences.emailNotifications': 1 } })
+    })
+
     it('mails the recipient alone, with a PWA link and no line breaks in the subject', async function () {
+      await optIn()
       const capture = captureMail()
       try {
         const ok = await notificationMail.sendForNotification(notification('assigned'))
@@ -103,7 +110,18 @@ describe('ticket notification e-mails', function () {
       }
     })
 
-    it('respects an opt-out', async function () {
+    it('sends nothing until the user opts in', async function () {
+      const capture = captureMail()
+      try {
+        expect(await notificationMail.sendForNotification(notification('comment'))).to.equal(false)
+        expect(await notificationMail.sendForNotification(notification('newTicket'))).to.equal(false)
+        expect(capture.sent).to.have.length(0)
+      } finally {
+        capture.restore()
+      }
+    })
+
+    it('stops again after an opt-out', async function () {
       await userSchema.updateOne({ _id: user._id }, { $set: { 'preferences.emailNotifications.personal': false } })
       const capture = captureMail()
       try {
@@ -111,11 +129,11 @@ describe('ticket notification e-mails', function () {
         expect(capture.sent).to.have.length(0)
       } finally {
         capture.restore()
-        await userSchema.updateOne({ _id: user._id }, { $unset: { 'preferences.emailNotifications': 1 } })
       }
     })
 
     it('is triggered by saving a notification with a mailKind only', async function () {
+      await optIn()
       const capture = captureMail()
       try {
         const plain = await NotificationSchema.create(notification(undefined))
@@ -141,14 +159,14 @@ describe('ticket notification e-mails', function () {
     it('returns the defaults and whether mail is available', async function () {
       const res = await call('get', path)
       expect(res.status).to.equal(200)
-      expect(res.body.email).to.deep.equal({ personal: true, newTickets: false })
+      expect(res.body.email).to.deep.equal({ personal: false, newTickets: false })
       expect(res.body.mailEnabled).to.equal(false)
     })
 
     it('updates single switches', async function () {
       const res = await call('put', path, { body: { email: { newTickets: true } } })
       expect(res.status).to.equal(200)
-      expect(res.body.email).to.deep.equal({ personal: true, newTickets: true })
+      expect(res.body.email).to.deep.equal({ personal: false, newTickets: true })
 
       const again = await call('get', path)
       expect(again.body.email.newTickets).to.equal(true)

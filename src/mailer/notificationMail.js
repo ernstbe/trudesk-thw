@@ -14,7 +14,8 @@ const winston = require('../logger')
 const MAIL_TIMEOUT_MS = 15 * 1000
 const MAX_SUBJECT_LENGTH = 120
 
-const DEFAULT_PREFS = { personal: true, newTickets: false }
+// Opt-in: no mail until the user switches it on in the PWA settings.
+const DEFAULT_PREFS = { personal: false, newTickets: false }
 
 const KINDS = {
   newTicket: {
