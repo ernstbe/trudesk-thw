@@ -12,19 +12,12 @@
  *  Copyright (c) 2014-2022. All rights reserved.
  */
 
-const path = require('path')
-
 const logger = require('../../logger')
 const Ticket = require('../../models/ticket')
 const User = require('../../models/user')
-const Setting = require('../../models/setting')
 const Department = require('../../models/department')
 const Notification = require('../../models/notification')
-const Template = require('../../models/template')
-const Mailer = require('../../mailer')
 
-const Email = require('email-templates')
-const templateDir = path.resolve(__dirname, '../..', 'mailer', 'templates')
 const permissions = require('../../permissions')
 
 const socketUtils = require('../../helpers/utils')
@@ -55,101 +48,18 @@ const getTeamMembers = async group => {
   }).flat(Infinity)
 }
 
-const parseMemberEmails = async ticket => {
-  const emails = []
-
+// Live-update every member's open ticket list. (E-mail for new tickets now
+// goes through the Notification model like push; see src/mailer/notificationMail.js.)
+const sendSocketUpdatesToMembers = async ticket => {
   const teamMembers = await getTeamMembers(ticket.group)
 
-  let members = [...teamMembers, ...ticket.group.members]
-  let emailTo = [...teamMembers, ...ticket.group.sendMailTo]
-
-  emailTo = [...new Set(
-    emailTo
-      .filter(i => i.email !== ticket.owner.email)
-      .map(i => i.email)
-  )]
-
   const seenIds = new Set()
-  members = members.filter(i => {
-    const id = String(i._id)
-    if (seenIds.has(id)) return false
+  for (const member of [...teamMembers, ...ticket.group.members]) {
+    if (!member || member.deleted) continue
+    const id = String(member._id)
+    if (seenIds.has(id)) continue
     seenIds.add(id)
-    return true
-  })
-
-  for (const member of members) {
-    if (member.deleted) continue
-
     sendSocketUpdateToUser(member, ticket)
-
-    if (typeof member.email === 'undefined' || emailTo.indexOf(member.email) === -1) continue
-
-    emails.push(member.email)
-  }
-
-  return [...new Set(emails)]
-}
-
-const sendMail = async (ticket, emails, baseUrl, betaEnabled) => {
-  if (emails.length < 1) {
-    logger.warn('[CreateTicketEvent::SendMail] - No recipients defined for sendMail')
-    return
-  }
-
-  let email = null
-
-  if (betaEnabled) {
-    email = new Email({
-      render: (view, locals) => {
-        return new Promise((resolve, reject) => {
-          ;(async () => {
-            try {
-              if (!global.Handlebars) return reject(new Error('Could not load global.Handlebars'))
-              const template = await Template.findOne({ name: view })
-              if (!template) return reject(new Error('Invalid Template'))
-              const html = global.Handlebars.compile(template.data['gjs-fullHtml'])(locals)
-              const results = await email.juiceResources(html)
-              return resolve(results)
-            } catch (e) {
-              return reject(e)
-            }
-          })()
-        })
-      }
-    })
-  } else {
-    email = new Email({
-      views: {
-        root: templateDir,
-        options: {
-          extension: 'handlebars'
-        }
-      }
-    })
-  }
-
-  const template = await Template.findOne({ name: 'new-ticket' })
-  if (template) {
-    const ticketJSON = ticket.toJSON()
-    const context = { base_url: baseUrl, ticket: ticketJSON }
-
-    const html = await email.render('new-ticket', context)
-    const subjectParsed = global.Handlebars.compile(template.subject)(context)
-    const mailOptions = {
-      to: emails.join(),
-      subject: subjectParsed,
-      html,
-      generateTextFromHTML: true
-    }
-
-    Mailer.sendMail(mailOptions, function (err) {
-      if (err) {
-        logger.error(err)
-        throw err
-      }
-
-      logger.debug(`Sent [${emails.length}] emails.`)
-    })
   }
 }
 
@@ -188,6 +98,7 @@ const saveNotification = async (user, ticket) => {
     message: ticket.subject,
     type: 0,
     data: { ticket },
+    mailKind: 'newTicket',
     unread: true
   })
 
@@ -201,17 +112,9 @@ module.exports = async data => {
 
   try {
     const ticket = await Ticket.getTicketById(ticketObject._id)
-    const settings = await Setting.getSettingsByName(['gen:siteurl', 'mailer:enable', 'beta:email'])
 
-    const baseUrl = settings.find(s => s.name === 'gen:siteurl').value
-    let mailerEnabled = settings.find(s => s.name === 'mailer:enable')
-    mailerEnabled = !mailerEnabled ? false : mailerEnabled.value
-    let betaEnabled = settings.find(s => s.name === 'beta:email')
-    betaEnabled = !betaEnabled ? false : betaEnabled.value
+    await sendSocketUpdatesToMembers(ticket)
 
-    const [emails] = await Promise.all([parseMemberEmails(ticket)])
-
-    if (mailerEnabled) await sendMail(ticket, emails, baseUrl, betaEnabled)
     if (ticket.group.public) await createPublicNotification(ticket)
     else await createNotification(ticket)
 

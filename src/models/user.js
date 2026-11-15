@@ -187,7 +187,13 @@ const userSchema = mongoose.Schema({
     autoRefreshTicketGrid: { type: Boolean, default: true },
     openChatWindows: [{ type: String, default: [] }],
     keyboardShortcuts: { type: Boolean, default: true },
-    timezone: { type: String }
+    timezone: { type: String },
+    // E-mail copies of in-app ticket notifications (src/mailer/notificationMail.js).
+    // personal = comments on own/assigned tickets, @mentions, assignments.
+    emailNotifications: {
+      personal: { type: Boolean, default: true },
+      newTickets: { type: Boolean, default: false }
+    }
   },
 
   // Ticket uids the user starred ("Favoriten"). Server-side so favorites

@@ -85,6 +85,17 @@ mailer.envConfig = function (env = process.env) {
 }
 
 /**
+ * Whether mail can go out at all: SMTP_* in the environment, or the
+ * mailer:enable database setting.
+ * @returns {Promise<boolean>}
+ */
+mailer.isEnabled = async function () {
+  if (mailer.envConfig()) return true
+  const setting = await settings.getSetting('mailer:enable')
+  return !!(setting && setting.value)
+}
+
+/**
  * nodemailer transport options. TLS certificates are always verified.
  * @param {{ host: string, port: number|string, secure: boolean, user?: string, pass?: string }} c
  * @param {boolean} requireTLS refuse to send when the server offers no STARTTLS
