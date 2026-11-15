@@ -409,26 +409,15 @@ async function addedDefaultPrioritiesToTicketTypes () {
   }))
 }
 
-async function mailTemplates () {
-  const newTicket = require('./json/mailer-new-ticket')
-  const passwordReset = require('./json/mailer-password-reset')
-  const templateSchema = require('../models/template')
-
-  const [existingNewTicket, existingPasswordReset] = await Promise.all([
-    templateSchema.findOne({ name: newTicket.name }),
-    templateSchema.findOne({ name: passwordReset.name })
-  ])
-
-  const creates = []
-  if (!existingNewTicket) {
-    creates.push(templateSchema.create(newTicket))
-  }
-  if (!existingPasswordReset) {
-    creates.push(templateSchema.create(passwordReset))
-  }
-  if (creates.length > 0) {
-    await Promise.all(creates)
-  }
+// Outgoing mail now comes only from SMTP_* in the environment (src/mailer).
+// Drop the old database settings so no SMTP password lingers in MongoDB and
+// its backups. beta:email belonged to the removed template editor.
+async function removeLegacyMailerSettings () {
+  await SettingsSchema.deleteMany({
+    name: {
+      $in: ['mailer:enable', 'mailer:host', 'mailer:ssl', 'mailer:port', 'mailer:username', 'mailer:password', 'mailer:from', 'beta:email']
+    }
+  })
 }
 
 async function elasticSearchConfToDB () {
@@ -534,7 +523,7 @@ settingsDefaults.init = async function (callback) {
     await addedDefaultPrioritiesToTicketTypes()
     await checkPriorities()
     await normalizeTags()
-    await mailTemplates()
+    await removeLegacyMailerSettings()
     await elasticSearchConfToDB()
     await maintenanceModeDefault()
     await installationID()

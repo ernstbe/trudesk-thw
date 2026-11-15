@@ -339,13 +339,6 @@ function mainRoutes (router, middleware, controllers) {
   router.get('/settings/legal', middleware.redirectToLogin, middleware.loadCommonData, controllers.settings.legal)
   router.get('/settings/logs', middleware.redirectToLogin, middleware.loadCommonData, controllers.settings.logs)
 
-  router.get(
-    '/settings/editor/:template',
-    middleware.redirectToLogin,
-    middleware.loadCommonData,
-    controllers.editor.page
-  )
-
   // Plugins
   router.get('/plugins', middleware.redirectToLogin, middleware.loadCommonData, controllers.plugins.get)
 
@@ -381,7 +374,6 @@ function mainRoutes (router, middleware, controllers) {
 
   if (global.env === 'development') {
     router.get('/debug/populatedb', controllers.debug.populatedatabase)
-    router.get('/debug/sendmail', controllers.debug.sendmail)
     router.get('/debug/mailcheck/refetch', function (req, res) {
       const mailCheck = require('../mailer/mailCheck')
       mailCheck.refetch()

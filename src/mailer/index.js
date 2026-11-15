@@ -14,50 +14,12 @@
 
 const nodeMailer = require('nodemailer')
 
-const settings = require('../models/setting')
-
 const mailer = {}
 
-mailer.sendMail = function (data, callback) {
-  createTransporter(function (err, mailSettings) {
-    if (err) return callback(err)
-    if (!mailSettings || !mailSettings.enabled) {
-      // Mail Disabled
-      return callback(null, 'Mail Disabled')
-    }
-
-    if (!mailSettings.from) return callback(new Error('No From Address Set.'))
-
-    data.from = mailSettings.from.value
-
-    if (!data.from) return callback(new Error('No From Address Set.'))
-
-    mailSettings.transporter.sendMail(data, callback)
-  })
-}
-
-mailer.verify = function (callback) {
-  createTransporter(function (err, mailSettings) {
-    if (err) return callback(err)
-
-    if (!mailSettings.enabled) {
-      const e = new Error('Mail Disabled')
-      e.code = 'Mail Disabled'
-      return callback(e)
-    }
-
-    mailSettings.transporter.verify(function (err) {
-      if (err) return callback(err)
-
-      return callback()
-    })
-  })
-}
-
 /**
- * SMTP configuration from the environment (deploy/.env). When SMTP_HOST is
- * set it replaces the mailer:* settings from the database entirely, so the
- * SMTP password never has to be stored in MongoDB (or its backups).
+ * SMTP configuration from the environment (deploy/.env). This is the only
+ * source: the old mailer:* database settings are no longer read, so the SMTP
+ * password never ends up in MongoDB or its backups.
  *
  *   SMTP_HOST    required to activate, e.g. mail.your-server.de
  *   SMTP_PORT    default 587 (465 when SMTP_SECURE=true)
@@ -85,79 +47,56 @@ mailer.envConfig = function (env = process.env) {
 }
 
 /**
- * Whether mail can go out at all: SMTP_* in the environment, or the
- * mailer:enable database setting.
+ * Whether mail can go out at all (SMTP_HOST is set).
  * @returns {Promise<boolean>}
  */
 mailer.isEnabled = async function () {
-  if (mailer.envConfig()) return true
-  const setting = await settings.getSetting('mailer:enable')
-  return !!(setting && setting.value)
+  return !!mailer.envConfig()
 }
 
 /**
- * nodemailer transport options. TLS certificates are always verified.
- * @param {{ host: string, port: number|string, secure: boolean, user?: string, pass?: string }} c
- * @param {boolean} requireTLS refuse to send when the server offers no STARTTLS
+ * nodemailer transport options. TLS certificates are always verified, and
+ * without implicit TLS the server must offer STARTTLS.
+ * @param {{ host: string, port: number, secure: boolean, user?: string, pass?: string }} c
  */
-mailer.transportOptions = function (c, requireTLS) {
+mailer.transportOptions = function (c) {
   const transport = {
-    host: c.host || '127.0.0.1',
-    port: c.port || 25,
+    host: c.host,
+    port: c.port,
     secure: !!c.secure,
-    requireTLS: !c.secure && !!requireTLS
+    requireTLS: !c.secure
   }
   if (c.user) transport.auth = { user: c.user, pass: c.pass || '' }
   return transport
 }
 
-function createTransporter (callback) {
-  const env = mailer.envConfig()
-  if (env) {
-    return finish(callback, {
-      enabled: true,
-      from: { value: env.from },
-      transport: mailer.transportOptions(env, true)
-    })
-  }
-
-  // Setting.getSettings is promise-based and ignores a callback argument;
-  // passing one (as this code used to) meant sendMail never called back.
-  settings.getSettings().then(function (s) { buildFromSettings(s, callback) }, callback)
+function disabledError () {
+  const e = new Error('Mail Disabled')
+  e.code = 'Mail Disabled'
+  return e
 }
 
-function buildFromSettings (s, callback) {
-  const value = function (name) {
-    const setting = s.find(function (x) {
-      return x.name === name
-    })
-    return setting ? setting.value : undefined
-  }
+/**
+ * Send a mail. Calls back with (null, 'Mail Disabled') when no SMTP is
+ * configured, so callers can treat "no mail" as a normal outcome.
+ */
+mailer.sendMail = function (data, callback) {
+  const config = mailer.envConfig()
+  if (!config) return callback(null, 'Mail Disabled')
+  if (!config.from) return callback(new Error('No From Address Set.'))
 
-  return finish(callback, {
-    enabled: value('mailer:enable') || false,
-    from: s.find(function (x) {
-      return x.name === 'mailer:from'
-    }),
-    transport: mailer.transportOptions(
-      {
-        host: value('mailer:host'),
-        port: value('mailer:port'),
-        secure: value('mailer:ssl'),
-        user: value('mailer:username'),
-        pass: value('mailer:password')
-      },
-      false
-    )
+  data.from = config.from
+  nodeMailer.createTransport(mailer.transportOptions(config)).sendMail(data, callback)
+}
+
+/** Check the SMTP connection and login (settings page "test" button). */
+mailer.verify = function (callback) {
+  const config = mailer.envConfig()
+  if (!config) return callback(disabledError())
+
+  nodeMailer.createTransport(mailer.transportOptions(config)).verify(function (err) {
+    return callback(err || undefined)
   })
-}
-
-function finish (callback, mailSettings) {
-  mailSettings.transporter = nodeMailer.createTransport(mailSettings.transport)
-  delete mailSettings.transport
-  mailer.transporter = mailSettings.transporter
-
-  return callback(null, mailSettings)
 }
 
 module.exports = mailer

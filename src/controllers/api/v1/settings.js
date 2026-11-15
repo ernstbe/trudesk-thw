@@ -75,8 +75,6 @@ apiSettings.getSettings = async function (req, res) {
       delete settings.data.settings.tpsEnabled
       delete settings.data.settings.tpsUsername
       delete settings.data.settings.tpsApiKey
-
-      delete settings.data.mailTemplates
     }
 
     return res.json({ success: true, settings })
@@ -176,26 +174,6 @@ apiSettings.testMailer = function (req, res) {
 
     return res.json({ success: true })
   })
-}
-
-apiSettings.updateTemplateSubject = async function (req, res) {
-  try {
-    const templateSchema = require('../../../models/template')
-    const id = req.params.id
-    let subject = req.body.subject
-    if (!subject) return res.status(400).json({ sucess: false, error: 'Invalid PUT data' })
-    subject = subject.trim()
-
-    const template = await templateSchema.findOne({ _id: id })
-    if (!template) return res.status(404).json({ success: false, error: 'No Template Found' })
-
-    template.subject = subject
-
-    await template.save()
-    return res.json({ success: true })
-  } catch (err) {
-    return defaultApiResponse(err, res)
-  }
 }
 
 apiSettings.buildsass = function (req, res) {
