@@ -21,6 +21,23 @@ const sanitizeHtml = require('sanitize-html')
 
 const apiTickets = {}
 
+// Group ids a v1 ticket read (list, search, single) may surface: the shared
+// resolveVisibleGroups set (which includes the caller's own #privatetickets
+// group even for agents/admins, whose department mapping never contains
+// it), plus public groups for tickets:public holders, as v1 always did.
+async function v1VisibleGroupIds (user) {
+  const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
+  const ids = await resolveVisibleGroups(user)
+  if (permissions.canThis(user.role, 'tickets:public')) {
+    const groupModel = require('../../../models/group')
+    const publicGroups = await groupModel.getAllPublicGroups()
+    for (const g of publicGroups) {
+      if (!ids.some(id => id.toString() === g._id.toString())) ids.push(g._id)
+    }
+  }
+  return ids
+}
+
 function buildGraphData (arr, days, callback) {
   const graphData = []
   const today = dayjs()
@@ -152,21 +169,9 @@ apiTickets.get = async function (req, res) {
   }
 
   const ticketModel = require('../../../models/ticket')
-  const groupModel = require('../../../models/group')
-  const departmentModel = require('../../../models/department')
 
   try {
-    let grps
-    if (user.role.isAdmin || user.role.isAgent) {
-      grps = await departmentModel.getDepartmentGroupsOfUser(user._id)
-    } else {
-      grps = await groupModel.getAllGroupsOfUserNoPopulate(user._id)
-    }
-
-    if (permissions.canThis(user.role, 'tickets:public')) {
-      const publicGroups = await groupModel.getAllPublicGroups()
-      grps = grps.concat(publicGroups)
-    }
+    const grps = await v1VisibleGroupIds(user)
 
     const results = await ticketModel.getTicketsWithObject(grps, object)
 
@@ -310,21 +315,9 @@ apiTickets.search = async function (req, res) {
   const searchString = req.query.search
 
   const ticketModel = require('../../../models/ticket')
-  const groupModel = require('../../../models/group')
-  const departmentModel = require('../../../models/department')
 
   try {
-    let grps
-    if (req.user.role.isAdmin || req.user.role.isAgent) {
-      grps = await departmentModel.getDepartmentGroupsOfUser(req.user._id)
-    } else {
-      grps = await groupModel.getAllGroupsOfUserNoPopulate(req.user._id)
-    }
-
-    if (permissions.canThis(req.user.role, 'tickets:public')) {
-      const publicGroups = await groupModel.getAllPublicGroups()
-      grps = grps.concat(publicGroups)
-    }
+    const grps = await v1VisibleGroupIds(req.user)
 
     const results = await ticketModel.getTicketsWithSearchString(grps, searchString)
 
@@ -682,6 +675,16 @@ apiTickets.single = async function (req, res) {
 
     if (ticket === undefined || ticket === null) {
       return res.status(200).json({ success: false, error: 'Invalid Ticket' })
+    }
+
+    // Same group gate as the v1 list/search below and ticketsV2.single.
+    // Without it any tickets:view holder could read any ticket by uid,
+    // across the Jugend/Stab boundary and including other users'
+    // #privatetickets.
+    const visible = (await v1VisibleGroupIds(req.user)).map(id => id.toString())
+    const gid = ticket.group ? (ticket.group._id || ticket.group).toString() : null
+    if (!gid || !visible.includes(gid)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' })
     }
 
     ticket = { ...ticket._doc }
@@ -2235,19 +2238,9 @@ apiTickets.getOverdue = async function (req, res) {
     }
 
     const ticketSchema = require('../../../models/ticket')
-    const departmentSchema = require('../../../models/department')
-    const groupSchema = require('../../../models/group')
+    const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
 
-    let groups
-    if (!req.user.role.isAdmin && !req.user.role.isAgent) {
-      groups = await groupSchema.getAllGroupsOfUserNoPopulate(req.user._id)
-    } else {
-      groups = await departmentSchema.getDepartmentGroupsOfUser(req.user._id)
-    }
-
-    const groupIds = groups.map(function (g) {
-      return g._id
-    })
+    const groupIds = await resolveVisibleGroups(req.user)
 
     const tickets = await ticketSchema.getOverdue(groupIds)
     const sorted = [...tickets].sort((a, b) => a.uid - b.uid).reverse()

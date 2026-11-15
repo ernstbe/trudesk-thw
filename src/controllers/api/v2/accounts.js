@@ -19,6 +19,7 @@ const User = require('../../../models/user')
 const Group = require('../../../models/group')
 const Team = require('../../../models/team')
 const Department = require('../../../models/department')
+const { mergeOwnPrivateGroup } = require('../../../helpers/visibleGroups')
 const passwordComplexity = require('../../../settings/passwordComplexity')
 
 const accountsApi = {}
@@ -33,6 +34,8 @@ accountsApi.sessionUser = async (req, res) => {
     let groups = []
     if (dbUser.role.isAdmin || dbUser.role.isAgent) groups = await Department.getDepartmentGroupsOfUser(dbUser._id)
     else groups = await Group.getAllGroupsOfUser(dbUser._id)
+    // #privatetickets — an agent/admin's own private group is in no department.
+    groups = await mergeOwnPrivateGroup(groups, dbUser._id)
 
     groups = groups.map(g => {
       return g._id

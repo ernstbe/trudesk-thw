@@ -1082,7 +1082,12 @@ apiUsers.getGroups = async function (req, res) {
   try {
     if (req.user.role.isAdmin || req.user.role.isAgent) {
       const departmentSchema = require('../../../models/department')
-      const groups = await departmentSchema.getDepartmentGroupsOfUser(req.user._id)
+      const { mergeOwnPrivateGroup } = require('../../../helpers/visibleGroups')
+      // #privatetickets — an agent/admin's own private group is in no department.
+      const groups = await mergeOwnPrivateGroup(
+        await departmentSchema.getDepartmentGroupsOfUser(req.user._id),
+        req.user._id
+      )
 
       const mappedGroups = groups.map(function (g) {
         return g._id
