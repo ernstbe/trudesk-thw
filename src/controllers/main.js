@@ -280,111 +280,23 @@ mainController.forgotL2Auth = async function (req, res) {
   }
 }
 
-mainController.forgotPass = async function (req, res) {
-  const data = req.body
-  if (data['forgotPass-email'] === undefined) {
+// #invite: the reset mail now carries a 1-hour link into the PWA where the
+// user picks a new password (previously a generated password was mailed in
+// plain text). Always answers 200 so the form cannot probe for accounts.
+mainController.forgotPass = function (req, res) {
+  const data = req.body || {}
+  const emailAddr = data['forgotPass-email']
+  if (typeof emailAddr !== 'string' || !emailAddr.trim()) {
     return res.status(400).send('No Form Data')
   }
 
-  const emailAddr = data['forgotPass-email']
-  const userSchema = require('../models/user')
+  res.status(200).send()
 
-  try {
-    const user = await userSchema.getUserByEmail(emailAddr)
-
-    if (!user) {
-      req.flash('Invalid Email: Account not found!')
-      return res.status(400).send('Invalid Email: Account not found!')
-    }
-
-    // Found user send Password Reset Email.
-    // Set User Reset Hash and Expire Date.
-    const Chance = require('chance')
-    const chance = new Chance()
-
-    user.resetPassHash = chance.hash({ casing: 'upper' })
-    const expireDate = new Date()
-    expireDate.setDate(expireDate.getDate() + 2)
-    user.resetPassExpire = expireDate
-
-    let savedUser = await user.save()
-
-    // Send mail
-    const mailer = require('../mailer')
-    const Email = require('email-templates')
-    const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
-    const templateSchema = require('../models/template')
-
-    let email = null
-
-    savedUser = savedUser.toJSON()
-
-    const renderData = {
-      base_url: req.protocol + '://' + req.get('host'),
-      user: savedUser
-    }
-
-    // Waterfall step 1: check beta email setting
-    const settingsSchema = require('../models/setting')
-    const setting = await settingsSchema.getSetting('beta:email')
-    const betaEnabled = !setting ? false : setting.value
-
-    // Waterfall step 2: check for template if beta enabled
-    let template = false
-    if (betaEnabled) {
-      const dbTemplate = await templateSchema.findOne({ name: 'password-reset' })
-      if (dbTemplate) {
-        email = new Email({
-          render: function (view, locals) {
-            return new Promise(function (resolve, reject) {
-              if (!global.Handlebars) return reject(new Error('Could not load global.Handlebars'))
-              templateSchema.findOne({ name: view }).then(function (tmpl) {
-                if (!tmpl) return reject(new Error('Invalid Template'))
-                const html = global.Handlebars.compile(tmpl.data['gjs-fullHtml'])(locals)
-                email.juiceResources(html).then(resolve)
-              }).catch(reject)
-            })
-          }
-        })
-        template = dbTemplate
-      }
-    }
-
-    // Waterfall step 3: fallback to file-based template
-    if (!template) {
-      email = new Email({
-        views: {
-          root: templateDir,
-          options: {
-            extension: 'handlebars'
-          }
-        }
-      })
-    }
-
-    const emailT = require('../i18n').t; let subject = emailT('passwordResetRequest', { siteTitle: 'Trudesk' })
-    if (template) subject = global.Handlebars.compile(template.subject)(renderData)
-
-    const html = await email.render('password-reset', renderData)
-    const mailOptions = {
-      to: savedUser.email,
-      subject,
-      html,
-      generateTextFromHTML: true
-    }
-
-    mailer.sendMail(mailOptions, function (err) {
-      if (err) {
-        winston.warn(err)
-        return res.status(400).send(err)
-      }
-      return res.status(200).send()
-    })
-  } catch (err) {
-    req.flash('loginMessage', 'Error: ' + err)
-    winston.warn(err)
-    return res.status(400).send(err.message)
-  }
+  setImmediate(() => {
+    require('../helpers/accountTokens')
+      .requestPasswordReset(emailAddr)
+      .catch(err => winston.warn(`Password reset request failed: ${err.message}`))
+  })
 }
 
 mainController.resetl2auth = async function (req, res) {
@@ -453,74 +365,13 @@ mainController.resetl2auth = async function (req, res) {
   }
 }
 
+// Links from reset mails sent before #invite pointed here. Reset now
+// happens in the PWA; forward there (old tokens are no longer valid and
+// the PWA page says so and offers a new request).
 mainController.resetPass = async function (req, res) {
-  const hash = req.params.hash
-
-  if (hash === undefined) {
-    return res.status(400).send('Invalid Link!')
-  }
-
-  const userSchema = require('../models/user')
-
   try {
-    const user = await userSchema.getUserByResetHash(hash)
-
-    if (!user) {
-      return res.status(400).send('Invalid Link!')
-    }
-
-    const now = new Date()
-    if (now < user.resetPassExpire) {
-      const Chance = require('chance')
-      const chance = new Chance()
-      const gPass = chance.string({ length: 8 })
-      user.password = gPass
-
-      user.resetPassHash = undefined
-      user.resetPassExpire = undefined
-
-      let updated = await user.save()
-
-      // Send mail
-      const mailer = require('../mailer')
-      const Email = require('email-templates')
-      const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
-
-      const emailRenderer = new Email({
-        views: {
-          root: templateDir,
-          options: {
-            extension: 'handlebars'
-          }
-        }
-      })
-
-      updated = updated.toJSON()
-
-      const renderData = {
-        password: gPass,
-        user: updated
-      }
-
-      const html = await emailRenderer.render('new-password', renderData)
-      const mailOptions = {
-        to: updated.email,
-        subject: require('../i18n').t('newPassword', { siteTitle: 'Trudesk' }),
-        html,
-        generateTextFromHTML: true
-      }
-
-      mailer.sendMail(mailOptions, function (err) {
-        if (err) {
-          winston.warn(err)
-          req.flash('loginMessage', err.message)
-          return res.redirect(307, '/')
-        }
-
-        req.flash('loginMessage', 'Password reset successfully')
-        return res.redirect(307, '/')
-      })
-    }
+    const base = await require('../helpers/accountTokens').pwaBaseUrl()
+    return res.redirect(302, `${base}/passwort-zuruecksetzen/${encodeURIComponent(req.params.hash || '')}`)
   } catch (err) {
     winston.warn(err)
     return res.status(400).send('Invalid Link!')

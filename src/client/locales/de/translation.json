@@ -162,7 +162,10 @@
       "nameMinLength": "Name muss mindestens 1 Zeichen enthalten.",
       "passwordMismatch": "Passwörter stimmen nicht überein",
       "selectRole": "Bitte wähle eine Rolle für diesen Benutzer",
-      "selectGroup": "Bitte wähle eine Gruppe für diesen Benutzer."
+      "selectGroup": "Bitte wähle eine Gruppe für diesen Benutzer.",
+      "sendInvite": "Einladung per E-Mail senden",
+      "sendInviteHint": "Der Benutzer legt das Passwort selbst fest (Link 7 Tage gültig).",
+      "setPasswordHint": "Passwort jetzt selbst vergeben."
     },
     "editAccount": {
       "title": "Benutzer bearbeiten",
@@ -371,7 +374,10 @@
     "deleteAccount": "Benutzer löschen",
     "resetPassword": "Passwort zurücksetzen",
     "enableAccount": "Benutzer aktivieren",
-    "disableAccount": "Benutzer deaktivieren"
+    "disableAccount": "Benutzer deaktivieren",
+    "status": "Status",
+    "invitePending": "Einladung ausstehend",
+    "resendInvite": "Einladung erneut senden"
   },
   "teams": {
     "customerGroups": "Gruppen",
@@ -557,7 +563,6 @@
     "esServerConfig": "Elasticsearch Server-Konfiguration",
     "esServerConfigHint": "Die Verbindungseinstellungen zum Elasticsearch-Server.",
     "esServerConfigTooltip": "Änderungen an den Servereinstellungen erfordern einen Neuaufbau des Index und einen Server-Neustart.",
-    "server": "Server",
     "port": "Port",
     "apply": "Anwenden",
     "rebuildIndex": "Index neu erstellen",

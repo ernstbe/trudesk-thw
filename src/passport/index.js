@@ -50,7 +50,7 @@ module.exports = function () {
           const user = await User.findOne({ username: username.trim().toLowerCase() })
             .select('+password +tOTPKey +tOTPPeriod')
 
-          if (!user || user.deleted || !User.validate(password, user.password)) {
+          if (!user || user.deleted || user.invitePending || !User.validate(password, user.password)) {
             req.flash('loginMessage', '')
             return done(null, false, req.flash('loginMessage', 'Invalid Username/Password'))
           }

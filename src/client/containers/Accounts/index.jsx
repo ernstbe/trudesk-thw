@@ -32,6 +32,8 @@ import Button from 'components/Button'
 import InfiniteScroll from 'react-infinite-scroller'
 
 import helpers from 'lib/helpers'
+import api from 'api'
+import { showInviteResult } from 'lib2/inviteResult'
 
 function AccountsContainer ({
   title = 'Accounts',
@@ -81,6 +83,17 @@ function AccountsContainer ({
     deleteAccountAction({ username: user.get('username') })
   }, [deleteAccountAction])
 
+  const onResendInviteClicked = useCallback((e, user) => {
+    e.preventDefault()
+    api.accounts
+      .resendInvite({ username: user.get('username') })
+      .then(res => showInviteResult(res.invite))
+      .catch(err => {
+        const msg = err.response && err.response.data ? err.response.data.error : err.message
+        helpers.UI.showSnackbar(`Error: ${msg}`, true)
+      })
+  }, [])
+
   const onEnableAccountClicked = useCallback((e, user) => {
     e.preventDefault()
     enableAccountAction({ username: user.get('username') })
@@ -98,6 +111,12 @@ function AccountsContainer ({
     accountsState.accounts.map(user => {
       const userImage = user.get('image') || 'defaultProfile.jpg'
       const actionMenu = [<DropdownItem key={0} text={t('common.edit')} onClick={e => onEditAccountClicked(e, user)} />]
+      const invitePending = user.get('invitePending') || false
+      if (invitePending && !user.get('deleted')) {
+        actionMenu.push(
+          <DropdownItem key={3} text={t('accounts.resendInvite')} onClick={e => onResendInviteClicked(e, user)} />
+        )
+      }
       if (user.get('deleted')) { actionMenu.push(<DropdownItem key={2} text={t('accounts.enableAccount')} onClick={e => onEnableAccountClicked(e, user)} />) } else {
         actionMenu.push(
           <DropdownItem
@@ -143,6 +162,14 @@ function AccountsContainer ({
             }
             content={
               <ul className='tru-list'>
+                {invitePending && (
+                  <li>
+                    <div className='tru-list-content'>
+                      <span className='tru-list-heading'>{t('accounts.status')}</span>
+                      <span className='uk-text-small uk-text-warning'>{t('accounts.invitePending')}</span>
+                    </div>
+                  </li>
+                )}
                 <li>
                   <div className='tru-list-content'>
                     <span className='tru-list-heading'>{t('accounts.role')}</span>

@@ -261,6 +261,12 @@ api.accounts.deleteAccount = ({ username }) => {
     return res.data
   })
 }
+// #invite: issue a fresh 7-day invitation link and mail it.
+api.accounts.resendInvite = ({ username }) => {
+  return axios.post(`/api/v2/accounts/${encodeURIComponent(username)}/invite`).then(res => {
+    return res.data
+  })
+}
 api.accounts.enableAccount = ({ username }) => {
   return axios.get(`/api/v1/users/${username}/enable`).then(res => {
     return res.data

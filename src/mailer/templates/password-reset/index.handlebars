@@ -2,29 +2,18 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Password Reset</title>
+    <title>Passwort zurücksetzen</title>
     <style>
-        h1,h2,h3,h4,h5,h6 {
-            margin-bottom: 2px;
-        }
-        hr {
-            display: block;
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            background: #ccc;
-            height: 3px;
-            border: none;
-        }
+        body { font-family: Arial, sans-serif; color: #333; }
+        .button { display: inline-block; padding: 10px 18px; background: #003399; color: #ffffff !important; text-decoration: none; border-radius: 4px; }
+        .muted { color: #888; font-size: 12px; }
     </style>
 </head>
 <body>
-<div>
-    <p>Dear {{user.fullname}},</p>
-    <p>You have requested to reset your password for your Trudesk account: {{user.username}}</p>
-    <p>
-        <a href="{{base_url}}/resetpassword/{{user.resetPassHash}}">Click here to reset your password</a>
-    </p>
-</div>
+    <p>Hallo {{fullname}},</p>
+    <p>für dein Konto <strong>{{username}}</strong> im THW-Ticketsystem wurde das Zurücksetzen des Passworts angefordert.</p>
+    <p><a class="button" href="{{url}}">Neues Passwort festlegen</a></p>
+    <p class="muted">Der Link ist bis {{expires}} Uhr gültig und funktioniert nur einmal. Falls er nicht klickbar ist, kopiere diese Adresse in den Browser:<br />{{url}}</p>
+    <p class="muted">Du hast das nicht angefordert? Dann ignoriere diese E-Mail, dein bisheriges Passwort bleibt gültig.</p>
 </body>
 </html>

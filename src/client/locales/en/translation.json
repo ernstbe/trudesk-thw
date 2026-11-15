@@ -162,7 +162,10 @@
       "nameMinLength": "Name must contain at least 1 character.",
       "passwordMismatch": "Password does not match",
       "selectRole": "Please select a role for this user",
-      "selectGroup": "Please select a group for this user."
+      "selectGroup": "Please select a group for this user.",
+      "sendInvite": "Send invitation e-mail",
+      "sendInviteHint": "The user sets their own password (link valid for 7 days).",
+      "setPasswordHint": "Set the password now."
     },
     "editAccount": {
       "title": "Edit User",
@@ -371,7 +374,10 @@
     "deleteAccount": "Delete User",
     "resetPassword": "Reset Password",
     "enableAccount": "Enable User",
-    "disableAccount": "Disable User"
+    "disableAccount": "Disable User",
+    "status": "Status",
+    "invitePending": "Invitation pending",
+    "resendInvite": "Resend invitation"
   },
   "teams": {
     "customerGroups": "Groups",
@@ -557,7 +563,6 @@
     "esServerConfig": "Elasticsearch Server Configuration",
     "esServerConfigHint": "The connection settings to the Elasticsearch server.",
     "esServerConfigTooltip": "Changing server settings will require a rebuild of the index and server restart.",
-    "server": "Server",
     "port": "Port",
     "apply": "Apply",
     "rebuildIndex": "Rebuild Index",

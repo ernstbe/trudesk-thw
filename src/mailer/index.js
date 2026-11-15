@@ -55,54 +55,56 @@ mailer.verify = function (callback) {
 }
 
 function createTransporter (callback) {
-  settings.getSettings(function (err, s) {
-    if (err) return callback(err)
+  // Setting.getSettings is promise-based and ignores a callback argument;
+  // passing one (as this code used to) meant sendMail never called back.
+  settings.getSettings().then(function (s) { buildTransporter(s, callback) }, callback)
+}
 
-    const mailSettings = {}
-    mailSettings.enabled = s.find(function (x) {
-      return x.name === 'mailer:enable'
-    })
-    mailSettings.host = s.find(function (x) {
-      return x.name === 'mailer:host'
-    })
-    mailSettings.ssl = s.find(function (x) {
-      return x.name === 'mailer:ssl'
-    })
-    mailSettings.port = s.find(function (x) {
-      return x.name === 'mailer:port'
-    })
-    mailSettings.username = s.find(function (x) {
-      return x.name === 'mailer:username'
-    })
-    mailSettings.password = s.find(function (x) {
-      return x.name === 'mailer:password'
-    })
-    mailSettings.from = s.find(function (x) {
-      return x.name === 'mailer:from'
-    })
-
-    mailSettings.enabled = mailSettings.enabled && mailSettings.enabled.value ? mailSettings.enabled.value : false
-
-    const transport = {
-      host: mailSettings.host && mailSettings.host.value ? mailSettings.host.value : '127.0.0.1',
-      port: mailSettings.port && mailSettings.port.value ? mailSettings.port.value : 25,
-      secure: mailSettings.ssl && mailSettings.ssl.value ? mailSettings.ssl.value : false,
-      tls: {
-        rejectUnauthorized: false
-      }
-    }
-    if (mailSettings.username && mailSettings.username.value) {
-      transport.auth = {
-        user: mailSettings.username.value,
-        pass: mailSettings.password && mailSettings.password.value ? mailSettings.password.value : ''
-      }
-    }
-
-    mailSettings.transporter = nodeMailer.createTransport(transport)
-    mailer.transporter = mailSettings.transporter
-
-    return callback(null, mailSettings)
+function buildTransporter (s, callback) {
+  const mailSettings = {}
+  mailSettings.enabled = s.find(function (x) {
+    return x.name === 'mailer:enable'
   })
+  mailSettings.host = s.find(function (x) {
+    return x.name === 'mailer:host'
+  })
+  mailSettings.ssl = s.find(function (x) {
+    return x.name === 'mailer:ssl'
+  })
+  mailSettings.port = s.find(function (x) {
+    return x.name === 'mailer:port'
+  })
+  mailSettings.username = s.find(function (x) {
+    return x.name === 'mailer:username'
+  })
+  mailSettings.password = s.find(function (x) {
+    return x.name === 'mailer:password'
+  })
+  mailSettings.from = s.find(function (x) {
+    return x.name === 'mailer:from'
+  })
+
+  mailSettings.enabled = mailSettings.enabled && mailSettings.enabled.value ? mailSettings.enabled.value : false
+
+  const transport = {
+    host: mailSettings.host && mailSettings.host.value ? mailSettings.host.value : '127.0.0.1',
+    port: mailSettings.port && mailSettings.port.value ? mailSettings.port.value : 25,
+    secure: mailSettings.ssl && mailSettings.ssl.value ? mailSettings.ssl.value : false,
+    tls: {
+      rejectUnauthorized: false
+    }
+  }
+  if (mailSettings.username && mailSettings.username.value) {
+    transport.auth = {
+      user: mailSettings.username.value,
+      pass: mailSettings.password && mailSettings.password.value ? mailSettings.password.value : ''
+    }
+  }
+
+  mailSettings.transporter = nodeMailer.createTransport(transport)
+  mailer.transporter = mailSettings.transporter
+
+  return callback(null, mailSettings)
 }
 
 module.exports = mailer

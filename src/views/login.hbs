@@ -268,7 +268,7 @@
                 async: true,
                 success: function() {
                     var alert = $('<div>').addClass('alert success').attr('role', 'alert')
-                        .text('Reset-E-Mail wurde versendet.');
+                        .text('Falls ein Konto mit dieser Adresse existiert, ist ein Link zum Zurücksetzen unterwegs (1 Stunde gültig).');
                     $('.card .alert').remove();
                     $('.card header.brand').after(alert);
                     $('#forgotPass-email').val('');

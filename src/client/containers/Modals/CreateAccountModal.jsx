@@ -39,6 +39,9 @@ function CreateAccountModal (props) {
   const [email, setEmail] = useState('')
   const [title, setTitle] = useState('')
   const [isAgentRole, setIsAgentRole] = useState(false)
+  // #invite: default is an invitation mail; the admin can switch to setting
+  // a password directly (e.g. for accounts without a reachable mailbox).
+  const [sendInvite, setSendInvite] = useState(true)
 
   const selectedRoleRef = useRef('')
   const groupSelectRef = useRef(null)
@@ -121,12 +124,13 @@ function CreateAccountModal (props) {
       groups: groupSelectRef.current ? groupSelectRef.current.getSelected() : undefined,
       teams: teamSelectRef.current ? teamSelectRef.current.getSelected() : undefined,
       role: selectedRoleRef.current,
-      password: password.length > 3 ? password : undefined,
-      passwordConfirm: passwordConfirm.length > 3 ? passwordConfirm : undefined
+      sendInvite,
+      password: !sendInvite && password.length > 3 ? password : undefined,
+      passwordConfirm: !sendInvite && passwordConfirm.length > 3 ? passwordConfirm : undefined
     }
 
     props.createAccount(payload)
-  }, [username, fullname, title, email, password, passwordConfirm])
+  }, [username, fullname, title, email, password, passwordConfirm, sendInvite])
 
   const roles = props.roles
     .map(role => {
@@ -201,6 +205,21 @@ function CreateAccountModal (props) {
             </div>
           </div>
           <div className='uk-margin-medium-bottom uk-clearfix'>
+            <div className='uk-float-left'>
+              <h4 style={{ paddingLeft: 2, marginBottom: 0 }}>{t('modals.createAccount.sendInvite')}</h4>
+              <span className='uk-text-small uk-text-muted'>
+                {sendInvite ? t('modals.createAccount.sendInviteHint') : t('modals.createAccount.setPasswordHint')}
+              </span>
+            </div>
+            <div className='uk-float-right md-switch md-green' style={{ marginTop: 5 }}>
+              <label>
+                {t('common.yes')}
+                <input type='checkbox' checked={sendInvite} onChange={e => setSendInvite(e.target.checked)} />
+                <span className='lever' />
+              </label>
+            </div>
+          </div>
+          <div className={'uk-margin-medium-bottom uk-clearfix' + (sendInvite ? ' hide' : '')}>
             <div className='uk-float-left' style={{ width: '50%', paddingRight: '20px' }}>
               <label className='uk-form-label'>{t('modals.createAccount.password')}</label>
               <input

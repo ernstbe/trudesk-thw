@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Einladung</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .button { display: inline-block; padding: 10px 18px; background: #003399; color: #ffffff !important; text-decoration: none; border-radius: 4px; }
+        .muted { color: #888; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <p>Hallo {{fullname}},</p>
+    <p>für dich wurde ein Konto im THW-Ticketsystem des OV Emmendingen angelegt. Dein Benutzername ist <strong>{{username}}</strong>.</p>
+    <p>Um das Konto zu aktivieren, lege bitte über diesen Link dein eigenes Passwort fest:</p>
+    <p><a class="button" href="{{url}}">Konto einrichten</a></p>
+    <p class="muted">Der Link ist bis {{expires}} Uhr gültig und funktioniert nur einmal. Falls er nicht klickbar ist, kopiere diese Adresse in den Browser:<br />{{url}}</p>
+    <p class="muted">Du hast keine Einladung erwartet? Dann kannst du diese E-Mail ignorieren.</p>
+</body>
+</html>
