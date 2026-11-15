@@ -12,7 +12,6 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-const path = require('path')
 const winston = require('../logger')
 
 const debugController = {}
@@ -441,62 +440,6 @@ debugController.populatedatabase = async function (req, res) {
 
 function randomDate (start, end) {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
-}
-
-debugController.sendmail = function (req, res) {
-  const mailer = require('../mailer')
-  const Email = require('email-templates')
-  const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
-
-  const to = req.query.email
-  if (to === undefined) {
-    return res.status(400).send('Invalid Email in querystring "email"')
-  }
-
-  const email = new Email({
-    views: {
-      root: templateDir,
-      options: {
-        extension: 'handlebars'
-      }
-    }
-  })
-
-  const ticket = {
-    uid: 100001,
-    issue: 'This is the test issue',
-    comments: [
-      {
-        date: new Date(),
-        comment: 'TESTING',
-        owner: {
-          fullname: 'test user',
-          email: 'test@test.com'
-        }
-      }
-    ]
-  }
-
-  email
-    .render('ticket-comment-added', { base_url: global.TRUDESK_BASEURL, ticket, comment: ticket.comments[0] })
-    .then(function (html) {
-      const mailOptions = {
-        to,
-        subject: 'Trudesk Test Email #' + ticket.uid + ' [Debugger]',
-        html,
-        generateTextFromHTML: true
-      }
-
-      mailer.sendMail(mailOptions, function (err) {
-        if (err) throw new Error(err)
-
-        return res.status(200).send('OK')
-      })
-    })
-    .catch(function (err) {
-      console.log(err)
-      res.status(400).json({ error: err })
-    })
 }
 
 debugController.uploadPlugin = function (req, res) {

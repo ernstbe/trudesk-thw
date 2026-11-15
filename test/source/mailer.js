@@ -41,19 +41,18 @@ describe('mailer SMTP configuration', function () {
 
   describe('transportOptions', function () {
     it('never disables certificate checks', function () {
-      const t = mailer.transportOptions({ host: 'h', port: 587, secure: false, user: 'u', pass: 'p' }, true)
+      const t = mailer.transportOptions({ host: 'h', port: 587, secure: false, user: 'u', pass: 'p' })
       expect(t.tls).to.equal(undefined)
       expect(t.requireTLS).to.equal(true)
       expect(t.auth).to.deep.equal({ user: 'u', pass: 'p' })
     })
 
-    it('does not force STARTTLS on implicit TLS or for database settings', function () {
-      expect(mailer.transportOptions({ host: 'h', port: 465, secure: true }, true).requireTLS).to.equal(false)
-      expect(mailer.transportOptions({ host: 'h', port: 25 }, false).requireTLS).to.equal(false)
+    it('does not force STARTTLS on implicit TLS', function () {
+      expect(mailer.transportOptions({ host: 'h', port: 465, secure: true }).requireTLS).to.equal(false)
     })
 
     it('omits auth without a user', function () {
-      expect(mailer.transportOptions({ host: 'h' }, false).auth).to.equal(undefined)
+      expect(mailer.transportOptions({ host: 'h', port: 587 }).auth).to.equal(undefined)
     })
   })
 })

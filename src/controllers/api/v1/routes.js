@@ -221,7 +221,6 @@ module.exports = function (middleware, router, controllers) {
   router.get('/api/v1/settings', apiv1, apiCtrl.settings.getSettings)
   router.put('/api/v1/settings', apiv1, isAdmin, apiCtrl.settings.updateSetting)
   router.post('/api/v1/settings/testmailer', apiv1, isAdmin, apiCtrl.settings.testMailer)
-  router.put('/api/v1/settings/mailer/template/:id', apiv1, isAdmin, apiCtrl.settings.updateTemplateSubject)
   router.get('/api/v1/settings/buildsass', apiv1, isAdmin, apiCtrl.settings.buildsass)
   router.put('/api/v1/settings/updateroleorder', apiv1, isAdmin, apiCtrl.settings.updateRoleOrder)
 
@@ -232,12 +231,4 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v1/backup/restore', apiv1, isAdmin, controllers.backuprestore.restoreBackup)
   router.post('/api/v1/backup/upload', apiv1, isAdmin, controllers.backuprestore.uploadBackup)
   router.get('/api/v1/backup/hastools', apiv1, isAdmin, controllers.backuprestore.hasBackupTools)
-
-  // Editor
-
-  router.get('/api/v1/editor/load/:id', apiv1, isAdmin, controllers.editor.load)
-  router.post('/api/v1/editor/save', apiv1, isAdmin, controllers.editor.save)
-  router.get('/api/v1/editor/assets', apiv1, isAdmin, controllers.editor.getAssets)
-  router.post('/api/v1/editor/assets/remove', apiv1, isAdmin, controllers.editor.removeAsset)
-  router.post('/api/v1/editor/assets/upload', apiv1, isAdmin, controllers.editor.assetsUpload)
 }

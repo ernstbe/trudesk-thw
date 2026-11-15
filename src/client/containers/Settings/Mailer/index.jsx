@@ -16,12 +16,10 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import MailerSettingsMailer from './mailer'
 import MailerMailerCheck from './mailerCheck'
-import MailerSettingsTemplates from 'containers/Settings/Mailer/mailerSettingsTemplates'
 
 const MailerSettingsContainer = ({ active }) => {
   return (
     <div className={active ? 'active' : 'hide'}>
-      <MailerSettingsTemplates />
       <MailerSettingsMailer />
       <MailerMailerCheck />
     </div>

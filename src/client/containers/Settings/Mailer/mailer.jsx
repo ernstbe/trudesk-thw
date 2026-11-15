@@ -12,98 +12,29 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import PropTypes from 'prop-types'
 import axios from 'axios'
 import Log from '../../../logger'
 import { connect } from 'react-redux'
 import { withTranslation } from 'react-i18next'
-import { updateSetting, updateMultipleSettings } from 'actions/settings'
 import helpers from 'lib/helpers'
 
 import Button from 'components/Button'
 import SettingItem from 'components/Settings/SettingItem'
-import EnableSwitch from 'components/Settings/EnableSwitch'
 
-const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings, t }) => {
-  const [mailerSSL, setMailerSSL] = useState('')
-  const [mailerHost, setMailerHost] = useState('')
-  const [mailerPort, setMailerPort] = useState('')
-  const [mailerUsername, setMailerUsername] = useState('')
-  const [mailerPassword, setMailerPassword] = useState('')
-  const [mailerFrom, setMailerFrom] = useState('')
-
-  useEffect(() => {
-    helpers.UI.inputs()
-  }, [])
-
-  useEffect(() => {
-    helpers.UI.reRenderInputs()
-  })
-
-  useEffect(() => {
-    if (settings) {
-      if (mailerSSL === '') setMailerSSL(settings.getIn(['settings', 'mailerSSL', 'value']) || '')
-      if (!mailerHost) setMailerHost(settings.getIn(['settings', 'mailerHost', 'value']) || '')
-      if (!mailerPort) setMailerPort(settings.getIn(['settings', 'mailerPort', 'value']) || '')
-      if (!mailerUsername) setMailerUsername(settings.getIn(['settings', 'mailerUsername', 'value']) || '')
-      if (!mailerPassword) setMailerPassword(settings.getIn(['settings', 'mailerPassword', 'value']) || '')
-      if (!mailerFrom) setMailerFrom(settings.getIn(['settings', 'mailerFrom', 'value']) || '')
-    }
-  }, [settings])
-
+// Outgoing mail is configured only through SMTP_* in the server environment
+// (see src/mailer). This page shows what is in effect and tests it.
+const MailerSettingsMailer = ({ settings, t }) => {
   const getSetting = useCallback(
     name => {
-      return settings.getIn(['settings', name, 'value']) ? settings.getIn(['settings', name, 'value']) : ''
+      const value = settings.getIn(['settings', name, 'value'])
+      return value === undefined || value === null ? '' : value
     },
     [settings]
   )
 
-  const envManaged = !!getSetting('mailerEnvManaged')
-  const locked = envManaged || !getSetting('mailerEnabled')
-
-  const onEnableMailerChanged = useCallback(
-    e => {
-      updateSetting({
-        name: 'mailer:enable',
-        stateName: 'mailerEnabled',
-        value: e.target.checked,
-        noSnackbar: true
-      })
-    },
-    [updateSetting]
-  )
-
-  const onMailerSSLChanged = useCallback(e => {
-    setMailerSSL(e.target.checked)
-  }, [])
-
-  const onInputValueChanged = useCallback((e, stateName) => {
-    const value = e.target.value
-    if (stateName === 'mailerHost') setMailerHost(value)
-    else if (stateName === 'mailerPort') setMailerPort(value)
-    else if (stateName === 'mailerUsername') setMailerUsername(value)
-    else if (stateName === 'mailerPassword') setMailerPassword(value)
-    else if (stateName === 'mailerFrom') setMailerFrom(value)
-  }, [])
-
-  const onMailerSubmit = useCallback(
-    e => {
-      e.preventDefault()
-
-      const mailSettings = [
-        { name: 'mailer:host', value: mailerHost },
-        { name: 'mailer:port', value: mailerPort },
-        { name: 'mailer:username', value: mailerUsername },
-        { name: 'mailer:password', value: mailerPassword },
-        { name: 'mailer:from', value: mailerFrom },
-        { name: 'mailer:ssl', value: mailerSSL }
-      ]
-
-      updateMultipleSettings(mailSettings)
-    },
-    [mailerHost, mailerPort, mailerUsername, mailerPassword, mailerFrom, mailerSSL, updateMultipleSettings]
-  )
+  const enabled = !!getSetting('mailerEnabled')
 
   const testMailerSettings = useCallback(
     e => {
@@ -124,119 +55,58 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
     [t]
   )
 
+  const rows = [
+    [t('settings.mailServer'), `${getSetting('mailerHost')}:${getSetting('mailerPort')} (${getSetting('mailerSSL') ? 'SSL/TLS' : 'STARTTLS'})`],
+    [t('settings.authUsername'), getSetting('mailerUsername')],
+    [t('settings.fromAddress'), getSetting('mailerFrom')]
+  ]
+
   return (
     <SettingItem
       title={t('settings.mailerTitle')}
       subtitle={t('settings.mailerHint')}
       component={
-        <EnableSwitch
-          stateName='mailerEnabled'
-          label={t('settings.enabled')}
-          onChange={e => onEnableMailerChanged(e)}
-          checked={getSetting('mailerEnabled')}
-          disabled={envManaged}
-        />
+        <span className={enabled ? 'uk-text-success' : 'uk-text-muted'} style={{ lineHeight: '36px' }}>
+          {t(enabled ? 'settings.enabled' : 'settings.mailerNotConfiguredShort')}
+        </span>
       }
     >
-      {envManaged && (
-        <p className='uk-text-muted uk-margin-medium-bottom'>{t('settings.mailerEnvManaged')}</p>
-      )}
-      <form onSubmit={e => onMailerSubmit(e)}>
-        <div className='uk-margin-medium-bottom'>
-          <div className='uk-right'>
-            <EnableSwitch
-              stateName='mailerSSL'
-              label={t('settings.useSSL')}
-              style={{ position: 'absolute', top: '5px', right: '-5px', zIndex: '99', margin: '0' }}
-              checked={mailerSSL}
-              disabled={locked}
-              onChange={e => onMailerSSLChanged(e)}
-            />
+      {enabled
+        ? (
+          <div>
+            <table className='uk-table uk-table-condensed uk-margin-small-bottom'>
+              <tbody>
+                {rows.map(([label, value]) => (
+                  <tr key={label}>
+                    <td className='uk-text-muted' style={{ width: '200px' }}>{label}</td>
+                    <td>{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className='uk-text-muted uk-margin-medium-bottom'>{t('settings.mailerEnvManaged')}</p>
+            <div className='uk-clearfix'>
+              <Button
+                text={t('settings.testSettings')}
+                type='button'
+                flat
+                waves
+                style='primary'
+                extraClass='uk-float-left'
+                onClick={e => testMailerSettings(e)}
+              />
+            </div>
           </div>
-          <label>{t('settings.mailServer')}</label>
-          <input
-            type='text'
-            className='md-input md-input-width-medium'
-            name='mailerHost'
-            disabled={locked}
-            value={mailerHost}
-            onChange={e => onInputValueChanged(e, 'mailerHost')}
-          />
-        </div>
-        <div className='uk-margin-medium-bottom'>
-          <label>{t('settings.port')}</label>
-          <input
-            type='text'
-            className='md-input md-input-width-medium'
-            name='mailerPort'
-            disabled={locked}
-            value={mailerPort}
-            onChange={e => onInputValueChanged(e, 'mailerPort')}
-          />
-        </div>
-        <div className='uk-margin-medium-bottom'>
-          <label>{t('settings.authUsername')}</label>
-          <input
-            type='text'
-            className='md-input md-input-width-medium'
-            name='mailerUsername'
-            disabled={locked}
-            value={mailerUsername}
-            onChange={e => onInputValueChanged(e, 'mailerUsername')}
-          />
-        </div>
-        <div className='uk-margin-medium-bottom'>
-          <label>{t('settings.authPassword')}</label>
-          <input
-            type='password'
-            className='md-input md-input-width-medium'
-            name='mailerPassword'
-            disabled={locked}
-            value={mailerPassword}
-            onChange={e => onInputValueChanged(e, 'mailerPassword')}
-          />
-        </div>
-        <div className='uk-margin-medium-bottom'>
-          <label>{t('settings.fromAddress')}</label>
-          <input
-            type='text'
-            className='md-input md-input-width-medium'
-            name='mailerFrom'
-            disabled={locked}
-            value={mailerFrom}
-            onChange={e => onInputValueChanged(e, 'mailerFrom')}
-          />
-        </div>
-        <div className='uk-clearfix'>
-          <Button
-            text={t('settings.testSettings')}
-            type='button'
-            flat
-            waves
-            style='primary'
-            extraClass='uk-float-left'
-            disabled={!getSetting('mailerEnabled')}
-            onClick={e => testMailerSettings(e)}
-          />
-          <Button
-            text={t('settings.apply')}
-            type='submit'
-            style='success'
-            extraClass='uk-float-right'
-            disabled={locked}
-            waves
-            flat
-          />
-        </div>
-      </form>
+          )
+        : (
+          <p className='uk-text-muted'>{t('settings.mailerNotConfigured')}</p>
+          )}
     </SettingItem>
   )
 }
 
 MailerSettingsMailer.propTypes = {
   settings: PropTypes.object.isRequired,
-  updateSetting: PropTypes.func.isRequired,
-  updateMultipleSettings: PropTypes.func.isRequired,
   t: PropTypes.func.isRequired
 }
 
@@ -244,7 +114,4 @@ const mapStateToProps = state => ({
   settings: state.settings.settings
 })
 
-export default withTranslation()(connect(
-  mapStateToProps,
-  { updateSetting, updateMultipleSettings }
-)(MailerSettingsMailer))
+export default withTranslation()(connect(mapStateToProps)(MailerSettingsMailer))

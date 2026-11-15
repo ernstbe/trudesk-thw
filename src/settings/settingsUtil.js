@@ -55,7 +55,6 @@ util.getSettings = async callback => {
         const s = {}
         const content = { data: {} }
 
-        s.emailBeta = parseSetting(settings, 'beta:email', false)
         s.hasThirdParty = !nconf.get('thirdParty') ? false : nconf.get('thirdParty').enable
 
         s.siteTitle = parseSetting(settings, 'gen:sitetitle', 'Trudesk')
@@ -86,27 +85,15 @@ util.getSettings = async callback => {
 
         s.defaultUserRole = parseSetting(settings, 'role:user:default', '')
 
-        s.mailerEnabled = parseSetting(settings, 'mailer:enable', false)
-        s.mailerHost = parseSetting(settings, 'mailer:host', '')
-        s.mailerSSL = parseSetting(settings, 'mailer:ssl', false)
-        s.mailerPort = parseSetting(settings, 'mailer:port', 25)
-        s.mailerUsername = parseSetting(settings, 'mailer:username', '')
-        s.mailerPassword = parseSetting(settings, 'mailer:password', '')
-        s.mailerFrom = parseSetting(settings, 'mailer:from', '')
-
-        // SMTP_* in the environment overrides the database settings (see
-        // src/mailer). Show what is in effect, never the password.
+        // Outgoing mail is configured only through SMTP_* in the environment
+        // (src/mailer). Shown read-only in the admin UI, never the password.
         const envMail = require('../mailer').envConfig()
-        s.mailerEnvManaged = { value: !!envMail }
-        if (envMail) {
-          s.mailerEnabled = { value: true }
-          s.mailerHost = { value: envMail.host }
-          s.mailerSSL = { value: envMail.secure }
-          s.mailerPort = { value: envMail.port }
-          s.mailerUsername = { value: envMail.user }
-          s.mailerPassword = { value: '' }
-          s.mailerFrom = { value: envMail.from }
-        }
+        s.mailerEnabled = { value: !!envMail }
+        s.mailerHost = { value: envMail ? envMail.host : '' }
+        s.mailerSSL = { value: envMail ? envMail.secure : false }
+        s.mailerPort = { value: envMail ? envMail.port : '' }
+        s.mailerUsername = { value: envMail ? envMail.user : '' }
+        s.mailerFrom = { value: envMail ? envMail.from : '' }
 
         s.mailerCheckEnabled = parseSetting(settings, 'mailer:check:enable', false)
         s.mailerCheckPolling = parseSetting(settings, 'mailer:check:polling', 600000)
@@ -160,10 +147,6 @@ util.getSettings = async callback => {
 
         const status = await statusSchema.getStatus()
         content.data.status = [...status].sort((a, b) => (a.order || 0) - (b.order || 0))
-
-        const templateSchema = require('../models/template')
-        const templates = await templateSchema.find({})
-        content.data.mailTemplates = [...templates].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 
         const tagSchema = require('../models/tag')
         const tagCount = await tagSchema.getTagCount()
