@@ -27,6 +27,7 @@ async function notifyAssignee (assigneeId, actingUserId, ticket) {
       message: ticket.subject || '',
       type: 0,
       data: { ticket: { _id: ticket._id, uid: ticket.uid, subject: ticket.subject } },
+      mailKind: 'assigned',
       unread: true
     })
     await notification.save()

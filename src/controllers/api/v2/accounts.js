@@ -192,6 +192,49 @@ async function ownFavorites (userId) {
   return dbUser && Array.isArray(dbUser.favoriteTicketUids) ? dbUser.favoriteTicketUids : []
 }
 
+// E-mail notification preferences of the signed-in user. mailEnabled tells
+// the PWA whether the server can send mail at all (else it hides the switches).
+async function ownNotificationSettings (userId) {
+  const { emailPrefs } = require('../../../mailer/notificationMail')
+  const mailer = require('../../../mailer')
+  const user = await User.findById(userId).select('preferences.emailNotifications').lean()
+  return { email: emailPrefs(user), mailEnabled: await mailer.isEnabled() }
+}
+
+accountsApi.getNotificationSettings = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+
+  try {
+    return apiUtil.sendApiSuccess(res, await ownNotificationSettings(req.user._id))
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
+accountsApi.updateNotificationSettings = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+
+  const email = req.body && req.body.email
+  if (!email || typeof email !== 'object') return apiUtil.sendApiError(res, 400, 'Invalid Request')
+
+  const $set = {}
+  for (const key of ['personal', 'newTickets']) {
+    if (email[key] === undefined) continue
+    if (typeof email[key] !== 'boolean') return apiUtil.sendApiError(res, 400, 'Invalid value for ' + key)
+    $set['preferences.emailNotifications.' + key] = email[key]
+  }
+  if (Object.keys($set).length === 0) return apiUtil.sendApiError(res, 400, 'Nothing to update')
+
+  try {
+    await User.updateOne({ _id: req.user._id }, { $set })
+    return apiUtil.sendApiSuccess(res, await ownNotificationSettings(req.user._id))
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
 accountsApi.getFavorites = async (req, res) => {
   if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
 

@@ -28,6 +28,10 @@ const notificationSchema = mongoose.Schema({
   message: { type: String, required: true },
   type: Number,
   data: Object,
+  // Set by the ticket callsites ('newTicket' | 'comment' | 'mention' |
+  // 'assigned') to also send an e-mail, subject to the owner's
+  // preferences.emailNotifications. Unset = in-app/push only.
+  mailKind: { type: String },
   unread: { type: Boolean, default: true }
 })
 
@@ -42,6 +46,15 @@ notificationSchema.pre('save', function () {
 
 notificationSchema.post('save', function (doc) {
   if (this.wasNew === false) return
+
+  if (doc.mailKind) {
+    // Lazy-require for the same reason as webpush below. Best-effort and
+    // async: never delays or fails the save.
+    try {
+      require('../mailer/notificationMail').sendForNotification(doc).catch(() => {})
+    } catch (e) { /* mail is optional */ }
+  }
+
   // Lazy-require to avoid a cycle: webpush -> userSchema -> notification.
   let webpush
   try { webpush = require('../webpush') } catch (e) { return }

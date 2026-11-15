@@ -49,6 +49,8 @@ module.exports = function (middleware, router, controllers) {
   router.get('/api/v2/accounts/me/export', apiv2Auth, apiv2.accounts.exportMyData)
   router.post('/api/v2/accounts/me/private-group', apiv2Auth, apiv2.accounts.enablePrivateGroup)
   router.get('/api/v2/accounts/me/favorites', apiv2Auth, apiv2.accounts.getFavorites)
+  router.get('/api/v2/accounts/me/notification-settings', apiv2Auth, apiv2.accounts.getNotificationSettings)
+  router.put('/api/v2/accounts/me/notification-settings', apiv2Auth, apiv2.accounts.updateNotificationSettings)
   router.put('/api/v2/accounts/me/favorites/:uid', apiv2Auth, apiv2.accounts.addFavorite)
   router.delete('/api/v2/accounts/me/favorites/:uid', apiv2Auth, apiv2.accounts.removeFavorite)
   router.put('/api/v2/accounts/profile', apiv2Auth, apiv2.accounts.saveProfile)

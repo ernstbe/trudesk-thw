@@ -12,13 +12,10 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
-const path = require('path')
 const winston = require('../logger')
 const emitter = require('../emitter')
 const NotificationSchema = require('../models/notification')
 const settingsSchema = require('../models/setting')
-const Email = require('email-templates')
-const templateDir = path.resolve(__dirname, '..', 'mailer', 'templates')
 const socketEvents = require('../socketio/socketEventConsts')
 const notifications = require('../notifications') // Load Push Events
 const { parseMentions } = require('../helpers/mentionParser')
@@ -157,15 +154,12 @@ function broadcastToTicketGroup (ticket, event, data) {
       const tpsSettings = await settingsSchema.getSettingsByName([
         'tps:enable',
         'tps:username',
-        'tps:apikey',
-        'mailer:enable'
+        'tps:apikey'
       ])
 
       let tpsEnabled = tpsSettings.find(s => s.name === 'tps:enable')
       let tpsUsername = tpsSettings.find(s => s.name === 'tps:username')
       let tpsApiKey = tpsSettings.find(s => s.name === 'tps:apikey')
-      let mailerEnabled = tpsSettings.find(s => s.name === 'mailer:enable')
-      mailerEnabled = !mailerEnabled ? false : mailerEnabled.value
 
       if (!tpsEnabled || !tpsUsername || !tpsApiKey) {
         tpsEnabled = false
@@ -190,6 +184,7 @@ function broadcastToTicketGroup (ticket, event, data) {
             message: ticket.subject,
             type: 1,
             data: { ticket },
+            mailKind: 'comment',
             unread: true
           })
 
@@ -207,6 +202,7 @@ function broadcastToTicketGroup (ticket, event, data) {
               message: ticket.subject,
               type: 2,
               data: { ticket },
+              mailKind: 'comment',
               unread: true
             })
 
@@ -234,6 +230,7 @@ function broadcastToTicketGroup (ticket, event, data) {
             message: ticket.subject,
             type: 2,
             data: { ticket },
+            mailKind: 'comment',
             unread: true
           })
 
@@ -262,6 +259,7 @@ function broadcastToTicketGroup (ticket, event, data) {
             message: ticket.subject,
             type: 2,
             data: { ticket },
+            mailKind: 'mention',
             unread: true
           })
 
@@ -283,58 +281,6 @@ function broadcastToTicketGroup (ticket, event, data) {
       )
 
       await Promise.all(notificationPromises)
-
-      // Send email to subscribed users
-      if (mailerEnabled) {
-        const mailer = require('../mailer')
-        let emails = []
-
-        for (const member of ticket.subscribers) {
-          if (member === undefined || member.email === undefined) continue
-          if (member._id.toString() === comment.owner.toString()) continue
-          if (member.deleted) continue
-
-          emails.push(member.email)
-        }
-
-        emails = [...new Set(emails)]
-
-        if (emails.length >= 1) {
-          const email = new Email({
-            views: {
-              root: templateDir,
-              options: {
-                extension: 'handlebars'
-              }
-            }
-          })
-
-          try {
-            const populatedTicket = await ticket.populate('comments.owner')
-            const ticketJSON = populatedTicket.toJSON()
-
-            const html = await email.render('ticket-comment-added', {
-              ticket: ticketJSON,
-              comment
-            })
-
-            const mailOptions = {
-              to: emails.join(),
-              subject: require('../i18n').t('ticketUpdated', { uid: ticketJSON.uid, subject: ticketJSON.subject }),
-              html,
-              generateTextFromHTML: true
-            }
-
-            mailer.sendMail(mailOptions, function (err) {
-              if (err) winston.warn('[trudesk:events:sendSubscriberEmail] - ' + err)
-
-              winston.debug('Sent [' + emails.length + '] emails.')
-            })
-          } catch (err) {
-            winston.warn('[trudesk:events:sendSubscriberEmail] - ' + err)
-          }
-        }
-      }
     } catch (err) {
       winston.warn(err)
     }
