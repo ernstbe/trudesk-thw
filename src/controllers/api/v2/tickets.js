@@ -254,29 +254,15 @@ ticketsV2.single = async function (req, res) {
     const ticket = await Models.Ticket.getTicketByUid(uid)
     if (!ticket) return apiUtils.sendApiError(res, 404, 'Ticket not found')
 
-    if (req.user.role.isAdmin || req.user.role.isAgent) {
-      const dbGroups = await Models.Department.getDepartmentGroupsOfUser(req.user._id)
-      const groups = dbGroups.map(function (g) {
-        return g._id.toString()
-      })
-
-      if (groups.includes(ticket.group._id.toString())) {
-        return apiUtils.sendApiSuccess(res, { ticket })
-      } else {
-        return apiUtils.sendApiError(res, 403, 'Forbidden')
-      }
-    } else {
-      const userGroups = await Models.Group.getAllGroupsOfUser(req.user._id)
-      const groupIds = userGroups.map(function (m) {
-        return m._id.toString()
-      })
-
-      if (groupIds.includes(ticket.group._id.toString())) {
-        return apiUtils.sendApiSuccess(res, { ticket })
-      } else {
-        return apiUtils.sendApiError(res, 403, 'Forbidden')
-      }
+    // resolveVisibleGroups, not a bare department lookup: an agent/admin's
+    // own #privatetickets group is in no department.
+    try {
+      await assertTicketGroupVisible(req.user, ticket)
+    } catch (forbidden) {
+      return apiUtils.sendApiError(res, 403, 'Forbidden')
     }
+
+    return apiUtils.sendApiSuccess(res, { ticket })
   } catch (err) {
     return apiUtils.sendApiError(res, 500, err.message || err)
   }

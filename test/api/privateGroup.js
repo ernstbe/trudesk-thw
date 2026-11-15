@@ -194,3 +194,167 @@ describe('#privatetickets — private group visibility', function () {
     expect(res.body.ticket.uid).to.equal(ticketUid)
   })
 })
+
+// #privatetickets — same guarantees when the OWNER is an agent. Agents and
+// admins resolve their visible groups through team -> department, and the
+// private group belongs to no department, so every endpoint that still did
+// its own Department.getDepartmentGroupsOfUser lookup (instead of going
+// through resolveVisibleGroups) hid the agent's own private tickets from
+// them. This is the PWA's default v1 path: list, search, single ticket.
+describe('#privatetickets — agent-owned private group', function () {
+  const baseUrl = 'http://localhost:3111'
+  const ownerToken = 'private-agent-owner-token'
+  const otherToken = 'private-agent-other-token'
+
+  let owner
+  let other
+  let team
+  let department
+  let privateGroupId
+  let ticketUid
+  let ticketId
+
+  before(async function () {
+    const supportRole = (await roleSchema.getRoles()).find(r => r.normalized === 'support')
+    owner = await userSchema.create({
+      username: 'privatetickets.agentowner',
+      password: '$2a$04$350Dkwcq9EpJLFhbeLB0buFcyFkI9q3edQEPpy/zqLjROMD9LPToW',
+      fullname: 'Private Tickets Agent Owner',
+      email: 'privatetickets.agentowner@trudesk.io',
+      role: supportRole._id,
+      accessToken: ownerToken
+    })
+    other = await userSchema.create({
+      username: 'privatetickets.agentother',
+      password: '$2a$04$350Dkwcq9EpJLFhbeLB0buFcyFkI9q3edQEPpy/zqLjROMD9LPToW',
+      fullname: 'Private Tickets Other Agent',
+      email: 'privatetickets.agentother@trudesk.io',
+      role: supportRole._id,
+      accessToken: otherToken
+    })
+
+    // Both agents sit in the same allGroups:true department, the widest
+    // sweep there is. The private group must still be owner-only.
+    team = await teamSchema.create({ name: 'Private Tickets Agent Owner Team', members: [owner._id, other._id] })
+    department = await departmentSchema.create({
+      name: 'Private Tickets Agent Owner Department',
+      teams: [team._id],
+      allGroups: true
+    })
+
+    const enableRes = await new Promise(function (resolve) {
+      superagent
+        .post(baseUrl + '/api/v2/accounts/me/private-group')
+        .set('accesstoken', ownerToken)
+        .type('json')
+        .send({})
+        .ok(function () { return true })
+        .end(function (err, res) { resolve(err ? { status: err.status || 0, body: {} } : res) })
+    })
+    privateGroupId = enableRes.body.group._id
+
+    const type = await tickettype.getTypeByName('Task')
+    let priority = await prioritySchema.findOne({ default: true })
+    if (!priority) priority = await prioritySchema.findOne({})
+    const createRes = await new Promise(function (resolve) {
+      superagent
+        .post(baseUrl + '/api/v1/tickets/create')
+        .set('accesstoken', ownerToken)
+        .type('json')
+        .send({
+          subject: 'Agent private ticket zebrafinch',
+          issue: 'Only the agent who owns this should see it',
+          type: type._id.toString(),
+          group: privateGroupId,
+          priority: priority._id.toString(),
+          tags: []
+        })
+        .ok(function () { return true })
+        .end(function (err, res) { resolve(err ? { status: err.status || 0, body: {} } : res) })
+    })
+    const ticket = createRes.body.ticket
+    ticketUid = ticket.uid
+    ticketId = ticket._id
+  })
+
+  after(async function () {
+    if (ticketId) await ticketModel.deleteOne({ _id: ticketId })
+    if (privateGroupId) await groupSchema.deleteOne({ _id: privateGroupId })
+    if (department) await departmentSchema.deleteOne({ _id: department._id })
+    if (team) await teamSchema.deleteOne({ _id: team._id })
+    if (owner) await userSchema.deleteOne({ _id: owner._id })
+    if (other) await userSchema.deleteOne({ _id: other._id })
+  })
+
+  function get (path, token) {
+    return new Promise(function (resolve) {
+      superagent
+        .get(baseUrl + path)
+        .set('accesstoken', token)
+        .ok(function () { return true })
+        .end(function (err, res) { resolve(err ? { status: err.status || 0, body: {} } : res) })
+    })
+  }
+
+  const uids = res => (res.body.tickets || []).map(t => t.uid)
+  const groupIds = res => (res.body.groups || []).map(g => (g._id || g).toString())
+
+  it('GET /api/v1/groups includes the private group for its agent owner', async function () {
+    const res = await get('/api/v1/groups', ownerToken)
+    expect(res.status).to.equal(200)
+    expect(groupIds(res)).to.include(privateGroupId)
+  })
+
+  it('GET /api/v1/tickets lists the private ticket for its agent owner only', async function () {
+    const mine = await get('/api/v1/tickets?limit=1000', ownerToken)
+    expect(mine.status).to.equal(200)
+    expect(uids(mine)).to.include(ticketUid)
+
+    const theirs = await get('/api/v1/tickets?limit=1000', otherToken)
+    expect(theirs.status).to.equal(200)
+    expect(uids(theirs)).to.not.include(ticketUid)
+  })
+
+  it('GET /api/v1/tickets/search finds the private ticket for its agent owner only', async function () {
+    const mine = await get('/api/v1/tickets/search?search=zebrafinch', ownerToken)
+    expect(mine.status).to.equal(200)
+    expect(uids(mine)).to.include(ticketUid)
+
+    const theirs = await get('/api/v1/tickets/search?search=zebrafinch', otherToken)
+    expect(uids(theirs)).to.not.include(ticketUid)
+  })
+
+  it('GET /api/v1/tickets/:uid returns the private ticket to its agent owner', async function () {
+    const res = await get('/api/v1/tickets/' + ticketUid, ownerToken)
+    expect(res.status).to.equal(200)
+    expect(res.body.success).to.be.true
+    expect(res.body.ticket.uid).to.equal(ticketUid)
+  })
+
+  it('GET /api/v1/tickets/:uid returns 403 to another agent', async function () {
+    const res = await get('/api/v1/tickets/' + ticketUid, otherToken)
+    expect(res.status).to.equal(403)
+    expect(res.body.ticket).to.be.undefined
+  })
+
+  it('GET /api/v2/tickets/:uid returns the private ticket to its agent owner, 403 to others', async function () {
+    const mine = await get('/api/v2/tickets/' + ticketUid, ownerToken)
+    expect(mine.status).to.equal(200)
+    expect(mine.body.ticket.uid).to.equal(ticketUid)
+
+    const theirs = await get('/api/v2/tickets/' + ticketUid, otherToken)
+    expect(theirs.status).to.equal(403)
+  })
+
+  it('session group lists include the private group for its agent owner only', async function () {
+    const session = await get('/api/v2/login', ownerToken)
+    expect(session.status).to.equal(200)
+    expect(session.body.groups.map(String)).to.include(privateGroupId)
+
+    const v1Groups = await get('/api/v1/users/privatetickets.agentowner/groups', ownerToken)
+    expect(groupIds(v1Groups)).to.include(privateGroupId)
+
+    const otherSession = await get('/api/v2/login', otherToken)
+    expect(otherSession.body.groups.map(String)).to.not.include(privateGroupId)
+  })
+})

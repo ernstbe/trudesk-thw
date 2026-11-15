@@ -14,7 +14,6 @@ const async = require('async')
 const path = require('path')
 const winston = require('../logger')
 const groupSchema = require('../models/group')
-const departmentSchema = require('../models/department')
 const permissions = require('../permissions')
 const xss = require('xss')
 const fs = require('fs-extra')
@@ -369,10 +368,10 @@ ticketsController.print = async function (req, res) {
 
     // Step 1: check department group access for admin/agent
     if (user.role.isAdmin || user.role.isAgent) {
-      const groups = await departmentSchema.getDepartmentGroupsOfUser(user._id)
-      const gIds = groups.map(function (g) {
-        return g._id
-      })
+      // resolveVisibleGroups = department groups + the agent's own
+      // #privatetickets group (which is in no department).
+      const { resolveVisibleGroups } = require('../helpers/visibleGroups')
+      const gIds = await resolveVisibleGroups(user)
 
       if (gIds.some(id => id.toString() === ticket.group._id.toString())) {
         if (!permissions.canThis(user.role, 'tickets:notes')) {
@@ -483,6 +482,9 @@ ticketsController.single = async function (req, res) {
           return d.groups
         }).flat(Infinity)
       }
+      // #privatetickets — the agent's own private group is in no department.
+      const ownPrivate = await groupSchema.getOwnPrivateGroup(req.user._id)
+      if (ownPrivate) userGroups = userGroups.concat(ownPrivate)
     }
 
     // Waterfall step 2: check access
