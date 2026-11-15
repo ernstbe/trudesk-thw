@@ -29,12 +29,12 @@
   .mg-line1-color
     stroke: $graph_path_color !important
   .mg-area1-color
-    fill: lighten($graph_path_color, 5%) !important
+    fill: adjust-lightness($graph_path_color, 5%) !important
   &.graph-blue
     .mg-line1-color
       stroke: #1976d2
     .mg-area1-color
-      fill: lighten(#1976d2, 10%)
+      fill: adjust-lightness(#1976d2, 10%)
 
 .mg-extended-y-ticks
-  stroke: darken($page_content_border_color, 80%) !important
+  stroke: adjust-lightness($page_content_border_color, -80%) !important

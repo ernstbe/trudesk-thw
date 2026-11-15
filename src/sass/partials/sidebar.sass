@@ -83,7 +83,7 @@ body > .side-nav-sub.tether-element
     top: 0
     width: 1px
     height: 100%
-    background: darken($sidebar_bg, 10%)
+    background: adjust-lightness($sidebar_bg, -10%)
 
   #expand-menu
     overflow: hidden
@@ -108,7 +108,7 @@ ul.side-nav
   padding: 0
   hr
     margin: 5px 0
-    background: darken($sidebar_bg, 10%)
+    background: adjust-lightness($sidebar_bg, -10%)
 
   // Section dividers. Collapsed rail (57px) shows just a thin centered line
   // (~9px tall total) so groupings are visible without dead vertical space.

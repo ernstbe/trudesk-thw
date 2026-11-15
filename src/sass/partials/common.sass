@@ -274,7 +274,7 @@
   background: $accent_success !important
   color: #fff !important
   &:hover
-    background: lighten($accent_success, 10%) !important
+    background: adjust-lightness($accent_success, 10%) !important
 
 .button-group>li
   float: left
@@ -381,7 +381,7 @@ button:hover,
 button:focus,
 .button:hover,
 .button:focus
-  background-color: darken($accent_color, 5%)
+  background-color: adjust-lightness($accent_color, -5%)
 
 
 button,
@@ -410,7 +410,7 @@ a.button
       font-size: 12px
 
   &:hover
-    background: darken($accent_color, 5%)
+    background: adjust-lightness($accent_color, -5%)
     color: white
 
   i
@@ -424,8 +424,8 @@ a.button
 //  left: 9px !important
 
 .f-dropdown
-  background: lighten(#eef1f7, 5%)
-  border: darken(#eef1f7, 15%)
+  background: adjust-lightness(#eef1f7, 5%)
+  border: adjust-lightness(#eef1f7, -15%)
   box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)
   &.noarrow
     &:before
@@ -441,7 +441,7 @@ a.button
     margin: 0
   &.trupanel
     background: $trupanel_bg
-    border: darken($trupanel_bg, 15%)
+    border: adjust-lightness($trupanel_bg, -15%)
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)
     transition: all 280ms ease-in-out
     -webkit-transition: all 280ms ease-in-out
@@ -451,7 +451,7 @@ a.button
     padding: 15px
   .panel-footer
     display: block
-    border-top: 1px solid darken($trupanel_bg, 15%)
+    border-top: 1px solid adjust-lightness($trupanel_bg, -15%)
     padding: 15px
 
 .panel-bg
@@ -463,7 +463,7 @@ a.button
     font-size: 24px
     font-weight: 500
     line-height: 30px
-    color: automatic-text-color(lighten($page_content_right_bg, 10%))
+    color: automatic-text-color(adjust-lightness($page_content_right_bg, 10%))
 
 .action-link
   background: transparent
@@ -730,17 +730,17 @@ div.hoverAction
 
   .chosen-container-multi
     .chosen-choices
-      border: 1px solid darken($page_content_right_bg, 15%) !important
-      background: darken($page_content_right_bg, 10%)
+      border: 1px solid adjust-lightness($page_content_right_bg, -15%) !important
+      background: adjust-lightness($page_content_right_bg, -10%)
       +borderRadius(3px)
 
     .chosen-drop
-      background: darken($page_content_right_bg, 10%)
-      border-color: darken($page_content_right_bg, 15%)
+      background: adjust-lightness($page_content_right_bg, -10%)
+      border-color: adjust-lightness($page_content_right_bg, -15%)
 
   span
     font-size: 0.875rem
-    color: automatic-text-color(lighten($page_content_right_bg, 15%), 'muted')
+    color: automatic-text-color(adjust-lightness($page_content_right_bg, 15%), 'muted')
     font-weight: normal
     line-height: 1.5
     margin-bottom: 0
@@ -754,7 +754,7 @@ div.hoverAction
     color: $text_color
     resize: none
     background: #f3f5f9
-    border: 1px solid darken($page_content_right_bg, 10%)
+    border: 1px solid adjust-lightness($page_content_right_bg, -10%)
     +borderRadius(3px)
     box-sizing: border-box
     +boxShadow(none)
@@ -778,7 +778,7 @@ div.hoverAction
       outline: none
     &.cancel
       background: #cdd5e4
-      color: darken(#707989, 10%)
+      color: adjust-lightness(#707989, -10%)
       &:hover,
       &:active
         background: #c3cddf
@@ -788,11 +788,11 @@ div.hoverAction
       font-weight: 500
       &:hover,
       &:active
-        background: darken(#F95E56, 10%)
+        background: adjust-lightness(#F95E56, -10%)
 
 .breads
   padding: 10px 15px
-  background: lighten($page_content_title_bg, 10%)
+  background: adjust-lightness($page_content_title_bg, 10%)
   border-top: $page_content_border_top
 
 .search-box input.ticket-top-search
@@ -856,7 +856,7 @@ div.hoverAction
 .datepicker td span.active,
 .datepicker td.active.day,
 .datepicker td.active.year
-  background: lighten($accent_color, 5%)
+  background: adjust-lightness($accent_color, 5%)
 
 .mde-error
   font-weight: 600

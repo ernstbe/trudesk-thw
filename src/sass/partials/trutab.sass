@@ -59,7 +59,7 @@ $size: 16px
       font-size: 13px
       margin: 0
       padding: 0 20px
-      color: lighten(#222, 50%)
+      color: adjust-lightness(#222, 50%)
 
       &.active
         color: $accent_color
@@ -94,7 +94,7 @@ $size: 16px
     display: block
     left: 0
     &.tru-tab-hr-lighten
-      background: lighten($page_content_title_border_color, 6%)
+      background: adjust-lightness($page_content_title_border_color, 6%)
 
   [class*='tru-tab-section']
     width: 100%

@@ -119,7 +119,7 @@
   transition: background 280ms ease-out, color 280ms ease-out
   &:hover, &:focus
     background: rgba(0, 0, 0, .08)
-    color: darken($text_color, 3%)
+    color: adjust-lightness($text_color, -3%)
 
 .tru-card.tru-card-overlay-active
   .tru-card-overlay-content
@@ -154,7 +154,7 @@
   a,a:active,a:focus
     color: $accent_color
     &:hover
-      color: lighten($accent_color, 10%)
+      color: adjust-lightness($accent_color, 10%)
 
 .trupanel.card-disabled
   background: #9E9E9E !important

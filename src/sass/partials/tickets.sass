@@ -96,7 +96,7 @@ div#accountsTable_wrapper
       font-size: 14px
       font-weight: 300
       &:hover
-        color: darken(#707989, 10%)
+        color: adjust-lightness(#707989, -10%)
     i
       display: inline-block
       margin-right: 8px
@@ -105,13 +105,13 @@ div#accountsTable_wrapper
 .page-top-comments
   .active > a,
   .active > button
-    background: darken($page_content_title_bg, 5%)
+    background: adjust-lightness($page_content_title_bg, -5%)
   a.btn,
   button.btn,
   button
-    background: darken($page_content_title_bg, 8%)
+    background: adjust-lightness($page_content_title_bg, -8%)
     display: block
-    color: automatic-text-color(darken($page_content_title_bg, 8%))
+    color: automatic-text-color(adjust-lightness($page_content_title_bg, -8%))
     font-family: $fontFamily
     font-weight: 400
     font-size: 12px
@@ -122,7 +122,7 @@ div#accountsTable_wrapper
     line-height: 14px
 
     &:hover
-      background: darken($page_content_title_bg, 12%)
+      background: adjust-lightness($page_content_title_bg, -12%)
 
     i
       font-weight: normal
@@ -142,7 +142,7 @@ div#accountsTable_wrapper
   h4
     font-family: $fontFamily
     font-size: 14px
-    color: darken($text_color, 10%)
+    color: adjust-lightness($text_color, -10%)
     margin-bottom: 10px
 
 .ticket-assignee
@@ -216,7 +216,7 @@ div#accountsTable_wrapper
     &:focus
       outline: none
       border-color: $text_color
-      background: lighten($text_color, 5%)
+      background: adjust-lightness($text_color, 5%)
       +boxShadow(none)
 
   select, select:focus
@@ -371,7 +371,7 @@ div#accountsTable_wrapper
           color: #76797e
       a
         font-size: 12px
-        color: darken(#76797e, 5)
+        color: adjust-lightness(#76797e, -5)
 
     p
       font-family: $fontFamily
@@ -393,7 +393,7 @@ div#accountsTable_wrapper
       font-size: 14px
       line-height: normal
       cursor: pointer
-      color: lighten($text_color, 20%)
+      color: adjust-lightness($text_color, 20%)
       opacity: 0.25
       transition: opacity ease 200ms
     .add-attachment
@@ -429,7 +429,7 @@ div#accountsTable_wrapper
         resize: none
         //background: #f3f5f9
         //border: 1px solid #dfe4ef
-        border-color: darken($page_content_bg, 10%)
+        border-color: adjust-lightness($page_content_bg, -10%)
         border-width: 0 0 1px
         background: inherit
         padding: 8px
@@ -456,17 +456,17 @@ div#accountsTable_wrapper
       &.success
         background: $accent_success
         &:hover
-          background: darken($accent_success, 5%)
+          background: adjust-lightness($accent_success, -5%)
 
       &:hover
-        background: darken($accent_color, 5%)
+        background: adjust-lightness($accent_color, -5%)
       &:active, &:focus
         outline: none
     button[type=reset]
       background: #cdd5e4
 
       &:hover
-        background: darken(#cdd5e4, 10%)
+        background: adjust-lightness(#cdd5e4, -10%)
 
 span.uk-form-danger
   font-size: 11px
@@ -497,7 +497,7 @@ form.form
     +boxShadow(none)
     border: 1px solid #9aa1ad
     &:focus
-      background: lighten(#eceff6, 5%)
+      background: adjust-lightness(#eceff6, 5%)
       +boxShadow(none)
       outline: none
 
@@ -506,4 +506,4 @@ form.form
 
 input[type="text"][disabled]
   color: automatic-text-color($page_content_bg, 'muted')
-  background: darken(#eceff6, 5%)
+  background: adjust-lightness(#eceff6, -5%)

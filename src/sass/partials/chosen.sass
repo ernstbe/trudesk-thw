@@ -43,16 +43,16 @@
     color: white
 
   .chosen-container-multi .chosen-drop .result-selected
-    color: darken($page_content_right_bg, 15%)
+    color: adjust-lightness($page_content_right_bg, -15%)
 
   button
     padding: 5px 10px
     height: 36px
     width: 50px
     margin-left: -50px
-    background: darken($page_content_right_bg, 20%)
-    border: 1px solid darken($page_content_right_bg, 20%)
-    color: automatic-text-color(darken($page_content_right_bg, 20%))
+    background: adjust-lightness($page_content_right_bg, -20%)
+    border: 1px solid adjust-lightness($page_content_right_bg, -20%)
+    color: automatic-text-color(adjust-lightness($page_content_right_bg, -20%))
     border-left: none
     +borderRadius(0 3px 3px 0)
     z-index: 999
@@ -79,7 +79,7 @@
     font-size: 12px
 
   .chosen-drop
-    background: darken(#f3f5f9, 5%)
+    background: adjust-lightness(#f3f5f9, -5%)
     border-color: #bec4d0
     +borderRadius(0 0 3px 3px)
     font-size: 12px
