@@ -58,6 +58,7 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v2/accounts/profile/update-password', apiv2Auth, apiv2.accounts.updatePassword)
   router.post('/api/v2/accounts/profile/picture', apiv2Auth, apiv2.accounts.uploadProfileImage)
   router.put('/api/v2/accounts/:username', apiv2Auth, canUser('accounts:update'), apiv2.accounts.update)
+  router.post('/api/v2/accounts/:username/invite', apiv2Auth, canUser('accounts:update'), apiv2.accounts.resendInvite)
 
   // Ticket Info
   router.get('/api/v2/tickets/info/types', apiv2Auth, apiv2.tickets.info.types)
@@ -234,4 +235,13 @@ module.exports = function (middleware, router, controllers) {
   router.post('/api/v2/public/users/checkemail', rateLimits.publicRegister, checkCaptcha, checkOrigin, apiv1.users.checkEmail)
   router.post('/api/v2/public/account/create', rateLimits.publicRegister, checkCaptcha, checkOrigin, apiv1.users.createPublicAccount)
   router.post('/api/v2/public/tickets/create', rateLimits.publicRegister, checkCaptcha, checkOrigin, apiv1.tickets.createPublicTicket)
+
+  // Invitation + password-reset links (#invite). Unauthenticated by
+  // design (the link token is the credential), so IP rate limited.
+  const links = apiv2.accountLinks
+  router.get('/api/v2/public/invite/:token', rateLimits.accountLink, links.check)
+  router.post('/api/v2/public/invite/:token', rateLimits.accountLink, links.accept)
+  router.post('/api/v2/public/password-reset', rateLimits.accountLink, links.requestReset)
+  router.get('/api/v2/public/password-reset/:token', rateLimits.accountLink, links.check)
+  router.post('/api/v2/public/password-reset/:token', rateLimits.accountLink, links.accept)
 }

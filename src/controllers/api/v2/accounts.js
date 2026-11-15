@@ -12,8 +12,10 @@
  *  Copyright (c) 2014-2019. All rights reserved.
  */
 
+const crypto = require('crypto')
 const winston = require('../../../logger')
 const Chance = require('chance')
+const accountTokens = require('../../../helpers/accountTokens')
 const apiUtil = require('../apiUtils')
 const User = require('../../../models/user')
 const Group = require('../../../models/group')
@@ -272,26 +274,47 @@ accountsApi.create = async function (req, res) {
   let savedId = null
   const chance = new Chance()
 
+  // #invite: with sendInvite the admin sets no password. The account gets
+  // an unusable random one and stays "invitation pending" (login refused)
+  // until the user picks a password via the 7-day link.
+  const sendInvite = postData.sendInvite === true
+  let invite = null
+
   try {
-    if (!postData.password || !postData.passwordConfirm) throw new Error('Password length is too short.')
+    if (!sendInvite) {
+      if (!postData.password || !postData.passwordConfirm) throw new Error('Password length is too short.')
 
-    // SETTINGS
-    const SettingsUtil = require('../../../settings/settingsUtil')
-    const settingsContent = await SettingsUtil.getSettings()
-    const settings = settingsContent.data.settings
-    const passwordComplexityEnabled = settings.accountsPasswordComplexity.value
+      // SETTINGS
+      const SettingsUtil = require('../../../settings/settingsUtil')
+      const settingsContent = await SettingsUtil.getSettings()
+      const settings = settingsContent.data.settings
+      const passwordComplexityEnabled = settings.accountsPasswordComplexity.value
 
-    if (passwordComplexityEnabled && !passwordComplexity.validate(postData.password)) { throw new Error('Password does not meet requirements') }
+      if (passwordComplexityEnabled && !passwordComplexity.validate(postData.password)) { throw new Error('Password does not meet requirements') }
+    }
 
-    let user = await User.create({
+    let user = new User({
       username: postData.username,
       email: postData.email,
-      password: postData.password,
+      password: sendInvite ? crypto.randomBytes(48).toString('base64') : postData.password,
       fullname: postData.fullname,
       title: postData.title,
       role: postData.role,
       accessToken: chance.hash()
     })
+    if (sendInvite) invite = await accountTokens.issueInvite(user)
+    await user.save()
+
+    if (invite) {
+      const mailed = await accountTokens.sendLinkMail({
+        user,
+        template: 'invite',
+        subjectKey: 'accountInvite',
+        url: invite.url,
+        expires: invite.expires
+      })
+      invite = { url: invite.url, expires: invite.expires, mailed }
+    }
 
     savedId = user._id
 
@@ -333,7 +356,34 @@ accountsApi.create = async function (req, res) {
       })
     }
 
-    return apiUtil.sendApiSuccess(res, { account: user })
+    // invite.url is returned so the admin can pass the link on by hand
+    // when no mail went out (mailer disabled, or an address that bounces).
+    return apiUtil.sendApiSuccess(res, invite ? { account: user, invite } : { account: user })
+  } catch (e) {
+    winston.warn(e)
+    return apiUtil.sendApiError(res, 500, e.message)
+  }
+}
+
+// POST /api/v2/accounts/:username/invite (#invite)
+// Issues a fresh 7-day invitation link (the old one stops working) for an
+// account that has not accepted yet, and mails it.
+accountsApi.resendInvite = async function (req, res) {
+  try {
+    const user = await User.findOne({ username: String(req.params.username).toLowerCase(), deleted: false })
+    if (!user) return apiUtil.sendApiError(res, 404, 'Invalid Account')
+    if (!user.invitePending) return apiUtil.sendApiError(res, 400, 'Account has already accepted its invitation')
+
+    const invite = await accountTokens.issueInvite(user)
+    await user.save()
+    const mailed = await accountTokens.sendLinkMail({
+      user,
+      template: 'invite',
+      subjectKey: 'accountInvite',
+      url: invite.url,
+      expires: invite.expires
+    })
+    return apiUtil.sendApiSuccess(res, { invite: { url: invite.url, expires: invite.expires, mailed } })
   } catch (e) {
     winston.warn(e)
     return apiUtil.sendApiError(res, 500, e.message)

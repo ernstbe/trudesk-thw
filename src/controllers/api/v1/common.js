@@ -58,7 +58,9 @@ commonV1.login = async function (req, res) {
 
   try {
     const user = await userModel.getUserByUsername(username)
-    if (!user) return res.status(401).json({ success: false, error: 'Invalid User' })
+    // Deleted accounts and accounts with an open invitation (#invite) cannot
+    // sign in; same answer as an unknown user.
+    if (!user || user.deleted || user.invitePending) return res.status(401).json({ success: false, error: 'Invalid User' })
 
     if (!userModel.validate(password, user.password)) { return res.status(401).json({ success: false, error: 'Invalid Password' }) }
 

@@ -29,6 +29,7 @@ import {
 import Log from '../../logger'
 import api from '../../api'
 import helpers from 'lib/helpers'
+import { showInviteResult } from 'lib2/inviteResult'
 
 function * fetchAccounts ({ payload, meta }) {
   yield put({ type: FETCH_ACCOUNTS.PENDING })
@@ -64,7 +65,8 @@ function * createAccount ({ payload }) {
     const response = yield call(api.accounts.create, payload)
     yield put({ type: CREATE_ACCOUNT.SUCCESS, response })
     yield put({ type: HIDE_MODAL.ACTION })
-    helpers.UI.showSnackbar('Account created successfully')
+    if (response.invite) yield call(showInviteResult, response.invite)
+    else helpers.UI.showSnackbar('Account created successfully')
   } catch (error) {
     const errorText = error.response.data.error
     helpers.UI.showSnackbar(`Error: ${errorText}`, true)

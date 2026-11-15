@@ -72,6 +72,12 @@ const userSchema = mongoose.Schema({
 
   resetPassHash: { type: String, select: false },
   resetPassExpire: { type: Date, select: false },
+  // Invitation onboarding (#invite). An invited account has no usable
+  // password until the user accepts the link and picks one. Only the
+  // SHA-256 of the link token is stored; see helpers/accountTokens.js.
+  invitePending: { type: Boolean, default: false },
+  inviteTokenHash: { type: String, select: false },
+  inviteExpire: { type: Date, select: false },
   tOTPKey: { type: String, select: false },
   tOTPPeriod: { type: Number, select: false },
   resetL2AuthHash: { type: String, select: false },
@@ -537,6 +543,24 @@ userSchema.statics.getUserByResetHash = async function (hash) {
   return this.model(COLLECTION).findOne(
     { resetPassHash: hash, deleted: false },
     '+resetPassHash +resetPassExpire'
+  )
+}
+
+/**
+ * Finds the user an invitation or password-reset link belongs to.
+ * `tokenHash` is the SHA-256 of the raw link token (the raw token itself
+ * is never stored). Expired links and deleted accounts are not returned.
+ *
+ * @param {'invite'|'reset'} kind
+ * @param {String} tokenHash
+ */
+userSchema.statics.getUserByLinkTokenHash = async function (kind, tokenHash) {
+  if (!tokenHash) return null
+  const hashField = kind === 'invite' ? 'inviteTokenHash' : 'resetPassHash'
+  const expireField = kind === 'invite' ? 'inviteExpire' : 'resetPassExpire'
+  return this.model(COLLECTION).findOne(
+    { [hashField]: tokenHash, [expireField]: { $gt: new Date() }, deleted: false },
+    `+${hashField} +${expireField} +accessTokens +accessToken`
   )
 }
 

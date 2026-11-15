@@ -3,6 +3,7 @@
   "ticketUpdated": "Updated: Ticket #{{uid}} - {{subject}}",
   "accountRecovery": "[{{siteTitle}}] Account Recovery",
   "passwordResetRequest": "[{{siteTitle}}] Password Reset Request",
+  "accountInvite": "[{{siteTitle}}] Invitation: set up your account",
   "twoFactorRemoved": "[{{siteTitle}}] Two-Factor Authentication Removed!",
   "newPassword": "[{{siteTitle}}] New Password",
   "welcomeAccount": "Welcome to {{siteTitle}}! - Here are your account details.",

@@ -25,7 +25,7 @@ commonV2.login = async (req, res) => {
 
   try {
     const user = await User.getUserByUsername(username)
-    if (!user) return apiUtils.sendApiError(res, 401, 'Invalid Username/Password')
+    if (!user || user.deleted || user.invitePending) return apiUtils.sendApiError(res, 401, 'Invalid Username/Password')
 
     if (!User.validate(password, user.password)) return apiUtils.sendApiError(res, 401, 'Invalid Username/Password')
 

@@ -60,6 +60,15 @@ const limiterConfigs = {
     points: 10,
     duration: 60 * 15,
     blockDuration: 60 * 15
+  },
+  // Invitation / password-reset links (#invite): checking a link, setting
+  // the password, requesting a reset mail. A real user needs a handful;
+  // the tokens are 256-bit, so this mostly stops reset-mail spam.
+  accountLink: {
+    keyPrefix: 'account_link_per_ip',
+    points: 10,
+    duration: 60 * 15,
+    blockDuration: 60 * 15
   }
 }
 
@@ -155,5 +164,6 @@ module.exports = {
   apiLogin: wrap('apiLogin'),
   publicRegister: wrap('publicRegister'),
   bugReportSubmit: wrapByUser('bugReportSubmit'),
-  webauthnAuth: wrap('webauthnAuth')
+  webauthnAuth: wrap('webauthnAuth'),
+  accountLink: wrap('accountLink')
 }
