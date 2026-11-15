@@ -1,3 +1,4 @@
+@use "sass:map"
 /*!
  /       .                             .o8                     oooo
  /    .o8                             "888                     `888
@@ -130,7 +131,7 @@ svg.bigdot circle
 
 // Top Preloader
 @function colour($value)
-  @return map-get($colours, $value)
+  @return map.get($colours, $value)
 
 
 // Variables

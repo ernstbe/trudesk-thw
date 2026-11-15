@@ -1,3 +1,5 @@
+@use "sass:color"
+
 /*!
  /       .                             .o8                     oooo
  /    .o8                             "888                     `888
@@ -337,7 +339,7 @@ label.md-label
   background: $page_content_right_bg
 
 .uk-file-upload
-  background: lighten($page_content_right_bg, 2%)
+  background: adjust-lightness($page_content_right_bg, 2%)
 
 .uk-accordion-title-small
   font-size: 13px
@@ -358,8 +360,8 @@ label.md-label
       +borderRadius(3px)
 
   li:not(.uk-active) > a:hover
-    background: lighten($page_content_bg, 10%)
-    color: automatic-text-color(lighten($page_content_bg, 10%))
+    background: adjust-lightness($page_content_bg, 10%)
+    color: automatic-text-color(adjust-lightness($page_content_bg, 10%))
 
   >.uk-active > *
     background: $accent_color
@@ -386,8 +388,8 @@ label.md-label
   &.uk-badge-danger
     background: #e53935
   &.uk-badge-grey
-    background: darken($page_content_right_bg, 5%)
-    color: automatic-text-color(darken($page_content_right_bg, 5%), 'muted')
+    background: adjust-lightness($page_content_right_bg, -5%)
+    color: automatic-text-color(adjust-lightness($page_content_right_bg, -5%), 'muted')
   &.uk-badge-small
     font-size: 10px
     padding: 2px 4px
@@ -428,17 +430,17 @@ label.md-label
   &:hover, &:active, &:focus
     color: $text_color
 a.uk-datepicker-table-muted
-  color: darken(automatic-text-color($page_content_right_bg, 'muted'), 5%)
+  color: adjust-lightness(automatic-text-color($page_content_right_bg, 'muted'), -5%)
   &:hover, &:active, &:focus
-    color: darken(automatic-text-color($page_content_right_bg, 'muted'), 5%)
+    color: adjust-lightness(automatic-text-color($page_content_right_bg, 'muted'), -5%)
 
 .uk-tooltip
-  background: mix(black, $page_content_bg, 65%)
-  color: automatic-text-color(mix(black, $page_content_bg, 65%))
+  background: color.mix(black, $page_content_bg, 65%)
+  color: automatic-text-color(color.mix(black, $page_content_bg, 65%))
 .uk-tooltip-top-left:after,
 .uk-tooltip-top-right:after,
 .uk-tooltip-top:after
-    border-top-color: mix(black, $page_content_bg, 65%) !important
+    border-top-color: color.mix(black, $page_content_bg, 65%) !important
 
 .uk-dropdown
   background: $page_content_button_color
@@ -457,7 +459,7 @@ a.uk-datepicker-table-muted
 .uk-button-success
   background-color: $success-color
   &:hover
-    background-color: darken($success-color, 10%)
+    background-color: adjust-lightness($success-color, -10%)
 
 .uk-button.uk-button-accent,
 .uk-button.uk-button-cancel
@@ -469,14 +471,14 @@ a.uk-datepicker-table-muted
   text-shadow: none
   &:hover,&:active,&:focus
     color: white
-    background: lighten($accent_color, 5%)
+    background: adjust-lightness($accent_color, 5%)
 
 .uk-button.uk-button-cancel
-  background: darken($page_content_right_bg, 10%)
-  color: automatic-text-color(darken($page_content_right_bg, 10%))
+  background: adjust-lightness($page_content_right_bg, -10%)
+  color: automatic-text-color(adjust-lightness($page_content_right_bg, -10%))
   &:hover,&:active,&:focus
-    color: automatic-text-color(darken($page_content_right_bg, 10%))
-    background: darken($page_content_right_bg, 25%)
+    color: automatic-text-color(adjust-lightness($page_content_right_bg, -10%))
+    background: adjust-lightness($page_content_right_bg, -25%)
 
 .uk-color-button
   padding: 0
@@ -531,7 +533,7 @@ a.uk-datepicker-table-muted
   color: automatic-text-color($page_content_bg)
 
 .uk-pagination>li>a:hover,.uk-pagination>li>a:active
-  background: darken($page_content_bg, 10%)
+  background: adjust-lightness($page_content_bg, -10%)
   color: automatic-text-color($page_content_bg)
 
 .title-shadow
@@ -648,7 +650,7 @@ body.shepherd-active
   position: absolute
   left: 20px
   bottom: -18px
-  color: darken($page_content_bg, 10%)
+  color: adjust-lightness($page_content_bg, -10%)
   font-size: 20px
   margin: 0
   padding: 0
@@ -664,7 +666,7 @@ textarea.review-list
 
 .no-data-available-text
   font-size: 2em
-  color: automatic-text-color(lighten($page_content_right_bg, 10%), 'muted')
+  color: automatic-text-color(adjust-lightness($page_content_right_bg, 10%), 'muted')
   font-weight: 300
   position: absolute
   top: 50%
@@ -675,14 +677,14 @@ textarea.review-list
   fill: $text_color !important
 
 .uk-table thead th
-  color: automatic-text-color(lighten($page_content_right_bg, 10%), 'muted')
+  color: automatic-text-color(adjust-lightness($page_content_right_bg, 10%), 'muted')
   border-bottom-width: 1px !important
 .uk-table td
   border-bottom: 1px solid $page_content_border_color
 .uk-table-striped tbody tr:nth-of-type(odd)
-  background: lighten($page_content_bg, 2%)
+  background: adjust-lightness($page_content_bg, 2%)
 .uk-table-striped tbody tr:nth-of-type(even)
-  background: darken($page_content_bg, 2%)
+  background: adjust-lightness($page_content_bg, -2%)
 
 .sticky-header
   thead, thead th
@@ -713,7 +715,7 @@ textarea.review-list
     font-weight: 600
     font-size: 14px
     line-height: 1.5
-    color: darken($text_color, 2%)
+    color: adjust-lightness($text_color, -2%)
     margin: 0
   .z-box,
   .dz-box
@@ -735,18 +737,18 @@ textarea.review-list
 
 .ms-container
   .ms-selectable
-    background: lighten($page_content_right_bg, 5%)
+    background: adjust-lightness($page_content_right_bg, 5%)
     li.ms-elem-selectable, li.ms-elem-selectable>span
       border-color: $page_content_border_color !important
-      color: automatic-text-color(lighten($page_content_right_bg, 5%))
+      color: automatic-text-color(adjust-lightness($page_content_right_bg, 5%))
       &.ms-hover
         span
           color: white
   .ms-selection
-    background: lighten($page_content_right_bg, 5%)
+    background: adjust-lightness($page_content_right_bg, 5%)
     li.ms-elem-selection, li.ms-elem-selection>span
       border-color: $page_content_border_color
-      color: automatic-text-color(lighten($page_content_right_bg, 5%))
+      color: automatic-text-color(adjust-lightness($page_content_right_bg, 5%))
       &.ms-hover
         span
           color: white

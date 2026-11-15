@@ -141,7 +141,7 @@
   display: inline-block
 
 .selectize-input
-  border: 0 solid darken($selectize_bg, 10%)
+  border: 0 solid adjust-lightness($selectize_bg, -10%)
   border-bottom-width: 1px
   padding: 8px 8px
   display: inline-block
@@ -231,7 +231,7 @@
 .selectize-dropdown
   position: absolute
   z-index: 10
-  border: 1px solid darken($selectize_bg, 10%)
+  border: 1px solid adjust-lightness($selectize_bg, -10%)
   background: $selectize_bg
   margin: -1px 0 0 0
   border-top: 0 none
@@ -312,7 +312,7 @@
       margin: 0 4px 0 -2px !important
   .selectize-input.disabled
     opacity: 0.5
-    background-color: darken($page_content_right_bg, 5%)
+    background-color: adjust-lightness($page_content_right_bg, -5%)
 
 .selectize-input
   border-color: rgba(0, 0, 0, 0.12)

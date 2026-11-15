@@ -53,7 +53,11 @@ function dynamicSass (entry, vars, success, error) {
       style: sassOptions.outputStyle === 'compressed' ? 'compressed' : 'expanded',
       loadPaths: sassOptions.includePaths,
       syntax: 'indented',
-      quiet: true
+      // The stylesheets still use @import (54 places); moving to @use/@forward
+      // changes variable scoping and @extend reach and needs its own careful
+      // pass. Every other deprecation is fixed and stays visible in the log.
+      // (The former 'quiet: true' is not a JS API option and silenced nothing.)
+      silenceDeprecations: ['import']
     })
 
     return success(result.css.toString())

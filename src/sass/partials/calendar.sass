@@ -25,7 +25,7 @@
       font-size: 24px
       height: 65px
       line-height: 65px
-      color: lighten(#223140, 10%)
+      color: adjust-lightness(#223140, 10%)
     button
       display: block
       font-family: "Source Sans Pro", sans-serif
@@ -42,11 +42,11 @@
       outline: none
 
       &:hover
-        background: lighten($accent_color, 5%)
+        background: adjust-lightness($accent_color, 5%)
         color: white
 
   table
-    background: lighten(#d5dae6, 5%)
+    background: adjust-lightness(#d5dae6, 5%)
   .fc-content-skeleton table
     background: none
 
@@ -54,12 +54,12 @@
     td,th,hr,thead,tbody,.fc-row,.fc-popover
       border-color: #b5bbc9
     thead
-      background: lighten(#b5bbc9, 5%)
+      background: adjust-lightness(#b5bbc9, 5%)
     .fc-bg .fc-today
       background: white
 
   .fc-event
-    border-color: darken($accent_color, 5%)
+    border-color: adjust-lightness($accent_color, -5%)
     background: $accent_color
     .fc-content
       background: $accent_color

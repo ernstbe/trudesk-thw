@@ -34,8 +34,8 @@ form#createTicketForm
     margin-right: 2px
     opacity: 0.8
     &:focus, &:hover
-      background-color: darken($page_content_right_bg, 10%)
-      border-color: darken($page_content_right_bg, 10%)
+      background-color: adjust-lightness($page_content_right_bg, -10%)
+      border-color: adjust-lightness($page_content_right_bg, -10%)
   i.separator
     margin: 3px 6px
     vertical-align: top
@@ -46,7 +46,7 @@ form#createTicketForm
   &.hasFileDesc
     border: 1px solid $page_content_border_color
     border-top-width: 0
-    background: darken($page_content_right_bg, 1%)
+    background: adjust-lightness($page_content_right_bg, -1%)
   .attachFileDesc
     display: inline-block
     float: left

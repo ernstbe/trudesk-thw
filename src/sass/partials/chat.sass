@@ -52,11 +52,11 @@
 
       .chat-box-title
         display: block
-        background: darken(#595f69, 10%)
+        background: adjust-lightness(#595f69, -10%)
         height: 29px
         border: 1px solid transparent
         cursor: pointer
-        +boxShadow(0 0 0 1px darken(#595f69, 10%))
+        +boxShadow(0 0 0 1px adjust-lightness(#595f69, -10%))
         //+borderRadius(3px 3px 0 0)
 
         .material-icons
@@ -67,7 +67,7 @@
           font-family: "Source Sans Pro", sans-serif
 
           a
-            color: automatic-text-color(darken(#595f69, 10%))
+            color: automatic-text-color(adjust-lightness(#595f69, -10%))
             &:hover
               text-decoration: underline
       .chat-box-title-buttons
@@ -117,7 +117,7 @@
         background: #edeff4
         height: 220px
         width: 100%
-        border-top: 1px solid darken($topbar_bg, 5%)
+        border-top: 1px solid adjust-lightness($topbar_bg, -5%)
         padding: 7px
 
         .chat-message

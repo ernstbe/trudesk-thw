@@ -1,3 +1,5 @@
+@use "sass:color";
+
 /*!
  *       .                             .o8                     oooo
  *    .o8                             "888                     `888
@@ -14,8 +16,8 @@
 
 @import "../materialize/components/color";
 $primary-color: color("materialize-red", "lighten-2") !default;
-$primary-color-light: lighten($primary-color, 15%) !default;
-$primary-color-dark: darken($primary-color, 15%) !default;
+$primary-color-light: adjust-lightness($primary-color, 15%) !default;
+$primary-color-dark: adjust-lightness($primary-color, -15%) !default;
 
 $secondary-color: color("blue", "darken-2") !default;
 $success-color: color("green", "base") !default;
@@ -73,7 +75,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
 }
 
 .md-switch input[type=checkbox]:checked + .lever {
-  background-color: lighten(#E74C3C, 15%);
+  background-color: adjust-lightness(#E74C3C, 15%);
 }
 
 .md-switch input[type=checkbox]:checked + .lever:after {
@@ -81,7 +83,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
 }
 
 .md-switch.md-blue input[type=checkbox]:checked + .lever {
-  background-color: lighten(#2196f3, 15%);
+  background-color: adjust-lightness(#2196f3, 15%);
 }
 
 .md-switch.md-blue input[type=checkbox]:checked + .lever:after {
@@ -89,7 +91,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
 }
 
 .md-switch.md-green input[type=checkbox]:checked + .lever {
-  background-color: lighten($accent_success, 15%);
+  background-color: adjust-lightness($accent_success, 15%);
 }
 
 .md-switch.md-green input[type=checkbox]:checked + .lever:after {
@@ -102,7 +104,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
   position: relative;
   width: 40px;
   height: 15px;
-  background-color: darken($page_content_bg, 5%);
+  background-color: adjust-lightness($page_content_bg, -5%);
   border-radius: 15px;
   //margin-right: 10px;
   transition: background 0.3s ease;
@@ -117,7 +119,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
   display: inline-block;
   width: 21px;
   height: 21px;
-  background-color: lighten($page_content_bg, 15%);
+  background-color: adjust-lightness($page_content_bg, 15%);
   border-radius: 21px;
   box-shadow: 0 1px 3px 1px rgba(0,0,0,.4);
   left: -5px;
@@ -127,7 +129,7 @@ $medium-only: "only screen and (min-width : #{$small-screen-up}) and (max-width 
 
 // Switch active style
 input[type=checkbox]:checked:not(:disabled) ~ .lever:active:after {
-  box-shadow: 0 1px 3px 1px rgba(0,0,0,.4), 0 0 0 15px transparentize(#fff, .9);
+  box-shadow: 0 1px 3px 1px rgba(0,0,0,.4), 0 0 0 15px color.adjust(#fff, $alpha: -.9);
 }
 
 input[type=checkbox]:not(:disabled) ~ .lever:active:after {
@@ -180,11 +182,11 @@ input[type=checkbox]:not(:disabled) ~ .lever:active:after {
 }
 
 .md-btn {
-  background: lighten($page_content_bg, 15%);
-  color: automatic-text-color(lighten($page_content_bg, 15%));
+  background: adjust-lightness($page_content_bg, 15%);
+  color: automatic-text-color(adjust-lightness($page_content_bg, 15%));
   &:hover, &:focus, &:active {
-    background: lighten($page_content_bg, 18%);
-    color: automatic-text-color(lighten($page_content_bg, 18%));
+    background: adjust-lightness($page_content_bg, 18%);
+    color: automatic-text-color(adjust-lightness($page_content_bg, 18%));
   }
 }
 
@@ -206,12 +208,12 @@ input[type=checkbox]:not(:disabled) ~ .lever:active:after {
   color: $text_color;
   &:hover, &:focus {
     //background: rgba(153, 153, 153, 0.2);
-    background: darken($page_bg_color, 5%);
+    background: adjust-lightness($page_bg_color, -5%);
     color: $text_color;
   }
   &:active {
     //background: rgba(153, 153, 153, 0.4);
-    background: darken($page_bg_color, 8%);
+    background: adjust-lightness($page_bg_color, -8%);
     color: $text_color;
   }
 }

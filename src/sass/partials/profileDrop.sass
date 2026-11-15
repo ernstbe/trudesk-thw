@@ -43,7 +43,7 @@
         float: right
   .profile-drop-dark-section
     min-height: 100px
-    background: darken(lighten($page_content_right_bg, 5%), 4.5%)
+    background: adjust-lightness(adjust-lightness($page_content_right_bg, 5%), -4.5%)
   .profile-drop-actions
     padding: 10px 0
     .action-logout
@@ -60,7 +60,7 @@
         padding: 10px 13px
         font-size: 14px
         line-height: 20px
-        color: automatic-link-custom-color(darken(lighten($page_content_right_bg, 5%), 4%), #444)
+        color: automatic-link-custom-color(adjust-lightness(adjust-lightness($page_content_right_bg, 5%), -4%), #444)
         &:hover
           color: $accent_blue
 
@@ -70,7 +70,7 @@
     left: 0
     height: 35px
     width: 100%
-    background-color: darken(lighten($page_content_right_bg, 5%), 4%)
+    background-color: adjust-lightness(adjust-lightness($page_content_right_bg, 5%), -4%)
     .links
       display: flex
       justify-content: center
@@ -81,4 +81,4 @@
       a, span
         margin: 0 5px
         font-size: 13px
-        color: automatic-link-custom-color(darken(lighten($page_content_right_bg, 5%), 4%), #555)
+        color: automatic-link-custom-color(adjust-lightness(adjust-lightness($page_content_right_bg, 5%), -4%), #555)

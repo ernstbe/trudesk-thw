@@ -1,3 +1,14 @@
+@use "sass:color"
+@use "sass:math"
+
+// Replacement for the deprecated lighten()/darken(): change the HSL lightness
+// and clamp it to 0-100% like they did. color.adjust($c, $lightness: x,
+// $space: hsl) does not clamp, which turned e.g. lighten(#f7f8fa, 5%) into
+// hsl(220, 23%, 107%) instead of white.
+@function adjust-lightness($color, $amount)
+  $lightness: color.channel($color, "lightness", $space: hsl) + $amount
+  @return color.change($color, $lightness: math.clamp(0%, $lightness, 100%), $space: hsl)
+
 /*!
  /       .                             .o8                     oooo
  /    .o8                             "888                     `888
@@ -14,36 +25,36 @@
 
 //Functions
 @function automatic-text-color($bgColor, $component:'')
-  @if (lightness($bgColor) > 50)
+  @if (color.channel($bgColor, 'lightness', $space: hsl) > 50)
     @if ($component != '' and $component == 'sidebar')
       @return #3f444c
     @else if ($component != '' and $component == 'muted')
       @return #757575
     @else
-      @return lighten($text_color, 5%)
+      @return adjust-lightness($text_color, 5%)
   @else
     @if ($component != '' and $component == 'muted')
-      @return lighten($bgColor, 45%)
+      @return adjust-lightness($bgColor, 45%)
     @else
       @return #f7f8fa
 
 @function automatic-link-color($bgColor)
-  @if (lightness($bgColor) > 50 and lightness($accent_color) > 75)
-    @return darken($accent_color, 40%)
+  @if (color.channel($bgColor, 'lightness', $space: hsl) > 50 and color.channel($accent_color, 'lightness', $space: hsl) > 75)
+    @return adjust-lightness($accent_color, -40%)
   @else
-    @return lighten($accent_color, 10%)
+    @return adjust-lightness($accent_color, 10%)
 
 @function automatic-link-custom-color($bgColor, $linkColor)
-  @if (lightness($bgColor) > 50 and lightness($linkColor) > 75)
-    @return darken($linkColor, 35%)
+  @if (color.channel($bgColor, 'lightness', $space: hsl) > 50 and color.channel($linkColor, 'lightness', $space: hsl) > 75)
+    @return adjust-lightness($linkColor, -35%)
   @else
-    @return lighten($linkColor, 10%)
+    @return adjust-lightness($linkColor, 10%)
 
 @function pre-color($bgColor)
-  @if (lightness($bgColor) > 50)
-    @return darken($bgColor, 5%)
+  @if (color.channel($bgColor, 'lightness', $space: hsl) > 50)
+    @return adjust-lightness($bgColor, -5%)
   @else
-    @return lighten($bgColor, 3%)
+    @return adjust-lightness($bgColor, 3%)
 
 @function pace-color()
   @if ($topbar_bg == #42464d)
@@ -52,7 +63,7 @@
     @return $accent_color
 
 @function topbar-separator-color()
-  @if (lightness($topbar_bg) > 50)
-    @return darken($topbar_bg, 15%)
+  @if (color.channel($topbar_bg, 'lightness', $space: hsl) > 50)
+    @return adjust-lightness($topbar_bg, -15%)
   @else
-    @return lighten($topbar_bg, 15%)
+    @return adjust-lightness($topbar_bg, 15%)

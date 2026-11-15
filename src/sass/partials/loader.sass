@@ -82,7 +82,7 @@
 
 .card-spinner
   position: absolute
-  background: darken($trupanel_bg, 5%)
+  background: adjust-lightness($trupanel_bg, -5%)
   top: 0
   left: 0
   bottom: 0
@@ -116,7 +116,7 @@
   height: 10px
   width: 75%
   +borderRadius(5px) 
-  background: darken($page_content_border_color, 7%)
+  background: adjust-lightness($page_content_border_color, -7%)
   animation: shim 1s infinite linear
 
   @keyframes shim
