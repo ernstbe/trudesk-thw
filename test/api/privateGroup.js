@@ -138,6 +138,13 @@ describe('#privatetickets — private group visibility', function () {
     expect(ids).to.include(privateGroupId)
   })
 
+  it('GET /api/v2/groups?type=all (admin listing) hides the private group even from its owner', async function () {
+    const res = await get('/api/v2/groups?type=all', ownerToken)
+    expect(res.status).to.equal(200)
+    const ids = res.body.groups.map(g => (g._id || g).toString())
+    expect(ids).to.not.include(privateGroupId)
+  })
+
   it('GET /api/v2/groups does not include the private group for an allGroups:true agent', async function () {
     const res = await get('/api/v2/groups?type=all', agentToken)
     expect(res.status).to.equal(200)

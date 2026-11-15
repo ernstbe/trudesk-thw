@@ -50,8 +50,11 @@ apiGroups.get = async function (req, res) {
 
   try {
     if (type === 'all') {
-      let groups = await Group.getWithObject({ limit, page })
-      groups = await mergeOwnPrivateGroup(groups, req.user._id)
+      // Admin listing (group management, assigning groups to accounts and
+      // departments). Private (#privatetickets) groups never appear here,
+      // not even the caller's own: assigning one to another account or a
+      // department would make it non-private. Pickers use type=user below.
+      const groups = await Group.getWithObject({ limit, page })
       return apiUtils.sendApiSuccess(res, { groups, count: groups.length })
     } else {
       let groups
