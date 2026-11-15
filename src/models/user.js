@@ -184,6 +184,10 @@ const userSchema = mongoose.Schema({
     timezone: { type: String }
   },
 
+  // Ticket uids the user starred ("Favoriten"). Server-side so favorites
+  // follow the user across devices; managed via /api/v2/accounts/me/favorites.
+  favoriteTicketUids: { type: [Number], default: [] },
+
   deleted: { type: Boolean, default: false }
 })
 

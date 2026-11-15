@@ -73,7 +73,7 @@ accountsApi.exportMyData = async (req, res) => {
     const userId = req.user._id
 
     const dbUser = await User.findOne({ _id: userId })
-      .select('username fullname email title workNumber mobileNumber role')
+      .select('username fullname email title workNumber mobileNumber role favoriteTicketUids')
       .populate('role', 'name')
       .lean()
     if (!dbUser) return apiUtil.sendApiError(res, 404, 'Invalid User')
@@ -159,6 +159,7 @@ accountsApi.exportMyData = async (req, res) => {
         'Datenexport gemäß Art. 15 DSGVO — alle zu Ihrem Benutzerkonto gespeicherten personenbezogenen Daten.',
       profile,
       tickets,
+      favoriteTicketUids: dbUser.favoriteTicketUids || [],
       comments,
       notes,
       attachments
@@ -167,6 +168,79 @@ accountsApi.exportMyData = async (req, res) => {
     const datestamp = new Date().toISOString().substring(0, 10)
     res.setHeader('Content-Disposition', `attachment; filename="datenexport-${dbUser.username}-${datestamp}.json"`)
     return res.json(exportDoc)
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
+// Ticket favorites ("Favoriten"): a per-user list of ticket uids, stored on
+// the user so it follows them across devices. Only the caller's OWN list is
+// ever read or written (req.user._id), and a ticket can only be starred if
+// the caller may see it.
+const MAX_FAVORITES = 500
+
+function parseTicketUid (raw) {
+  const uid = Number(raw)
+  return Number.isInteger(uid) && uid > 0 ? uid : null
+}
+
+async function ownFavorites (userId) {
+  const dbUser = await User.findOne({ _id: userId }).select('favoriteTicketUids').lean()
+  return dbUser && Array.isArray(dbUser.favoriteTicketUids) ? dbUser.favoriteTicketUids : []
+}
+
+accountsApi.getFavorites = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+
+  try {
+    return apiUtil.sendApiSuccess(res, { favorites: await ownFavorites(req.user._id) })
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
+accountsApi.addFavorite = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+  const uid = parseTicketUid(req.params.uid)
+  if (uid === null) return apiUtil.sendApiError(res, 400, 'Invalid ticket uid')
+
+  try {
+    const Ticket = require('../../../models/ticket')
+    const ticket = await Ticket.getTicketByUid(uid)
+    if (!ticket || ticket.deleted) return apiUtil.sendApiError(res, 404, 'Ticket not found')
+
+    const { assertTicketGroupVisible } = require('../../../helpers/visibleGroups')
+    try {
+      await assertTicketGroupVisible(req.user, ticket)
+    } catch (forbidden) {
+      return apiUtil.sendApiError(res, 403, 'Forbidden')
+    }
+
+    const current = await ownFavorites(req.user._id)
+    if (!current.includes(uid) && current.length >= MAX_FAVORITES) {
+      return apiUtil.sendApiError(res, 400, 'Too many favorites')
+    }
+
+    await User.updateOne({ _id: req.user._id }, { $addToSet: { favoriteTicketUids: uid } })
+    return apiUtil.sendApiSuccess(res, { favorites: await ownFavorites(req.user._id) })
+  } catch (error) {
+    winston.warn(error)
+    return apiUtil.sendApiError(res, 500, error.message)
+  }
+}
+
+accountsApi.removeFavorite = async (req, res) => {
+  if (!req.user || !req.user._id) return apiUtil.sendApiError(res, 401, 'Invalid Request')
+  const uid = parseTicketUid(req.params.uid)
+  if (uid === null) return apiUtil.sendApiError(res, 400, 'Invalid ticket uid')
+
+  try {
+    // No visibility check: removing an entry from your own list is always
+    // allowed, also for a ticket that has since moved out of your groups.
+    await User.updateOne({ _id: req.user._id }, { $pull: { favoriteTicketUids: uid } })
+    return apiUtil.sendApiSuccess(res, { favorites: await ownFavorites(req.user._id) })
   } catch (error) {
     winston.warn(error)
     return apiUtil.sendApiError(res, 500, error.message)

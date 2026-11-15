@@ -48,6 +48,9 @@ module.exports = function (middleware, router, controllers) {
   // No extra grant: every authenticated user may export their OWN data.
   router.get('/api/v2/accounts/me/export', apiv2Auth, apiv2.accounts.exportMyData)
   router.post('/api/v2/accounts/me/private-group', apiv2Auth, apiv2.accounts.enablePrivateGroup)
+  router.get('/api/v2/accounts/me/favorites', apiv2Auth, apiv2.accounts.getFavorites)
+  router.put('/api/v2/accounts/me/favorites/:uid', apiv2Auth, apiv2.accounts.addFavorite)
+  router.delete('/api/v2/accounts/me/favorites/:uid', apiv2Auth, apiv2.accounts.removeFavorite)
   router.put('/api/v2/accounts/profile', apiv2Auth, apiv2.accounts.saveProfile)
   router.post('/api/v2/accounts/profile/mfa', apiv2Auth, apiv2.accounts.generateMFA)
   router.post('/api/v2/accounts/profile/mfa/verify', apiv2Auth, apiv2.accounts.verifyMFA)
