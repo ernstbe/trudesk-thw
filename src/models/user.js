@@ -190,8 +190,9 @@ const userSchema = mongoose.Schema({
     timezone: { type: String },
     // E-mail copies of in-app ticket notifications (src/mailer/notificationMail.js).
     // personal = comments on own/assigned tickets, @mentions, assignments.
+    // Both opt-in: nobody gets mail until they switch it on in the PWA.
     emailNotifications: {
-      personal: { type: Boolean, default: true },
+      personal: { type: Boolean, default: false },
       newTickets: { type: Boolean, default: false }
     }
   },
