@@ -578,6 +578,7 @@
     "rebuildingIndex": "Index wird neu erstellt...",
     "mailerTitle": "E-Mail-Versand",
     "mailerHint": "Einstellungen für den E-Mail-Versand von Benachrichtigungen an Benutzer.",
+    "mailerEnvManaged": "Der E-Mail-Versand wird über die Server-Umgebung (SMTP_* in der .env) konfiguriert. Änderungen hier sind deshalb gesperrt; der Test-Knopf prüft die aktive Verbindung.",
     "enabled": "Aktiviert",
     "useSSL": "SSLv3 verwenden",
     "mailServer": "Mail-Server",

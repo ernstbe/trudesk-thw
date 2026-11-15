@@ -59,6 +59,9 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
     [settings]
   )
 
+  const envManaged = !!getSetting('mailerEnvManaged')
+  const locked = envManaged || !getSetting('mailerEnabled')
+
   const onEnableMailerChanged = useCallback(
     e => {
       updateSetting({
@@ -131,9 +134,13 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
           label={t('settings.enabled')}
           onChange={e => onEnableMailerChanged(e)}
           checked={getSetting('mailerEnabled')}
+          disabled={envManaged}
         />
       }
     >
+      {envManaged && (
+        <p className='uk-text-muted uk-margin-medium-bottom'>{t('settings.mailerEnvManaged')}</p>
+      )}
       <form onSubmit={e => onMailerSubmit(e)}>
         <div className='uk-margin-medium-bottom'>
           <div className='uk-right'>
@@ -142,7 +149,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
               label={t('settings.useSSL')}
               style={{ position: 'absolute', top: '5px', right: '-5px', zIndex: '99', margin: '0' }}
               checked={mailerSSL}
-              disabled={!getSetting('mailerEnabled')}
+              disabled={locked}
               onChange={e => onMailerSSLChanged(e)}
             />
           </div>
@@ -151,7 +158,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='text'
             className='md-input md-input-width-medium'
             name='mailerHost'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             value={mailerHost}
             onChange={e => onInputValueChanged(e, 'mailerHost')}
           />
@@ -162,7 +169,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='text'
             className='md-input md-input-width-medium'
             name='mailerPort'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             value={mailerPort}
             onChange={e => onInputValueChanged(e, 'mailerPort')}
           />
@@ -173,7 +180,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='text'
             className='md-input md-input-width-medium'
             name='mailerUsername'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             value={mailerUsername}
             onChange={e => onInputValueChanged(e, 'mailerUsername')}
           />
@@ -184,7 +191,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='password'
             className='md-input md-input-width-medium'
             name='mailerPassword'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             value={mailerPassword}
             onChange={e => onInputValueChanged(e, 'mailerPassword')}
           />
@@ -195,7 +202,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='text'
             className='md-input md-input-width-medium'
             name='mailerFrom'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             value={mailerFrom}
             onChange={e => onInputValueChanged(e, 'mailerFrom')}
           />
@@ -216,7 +223,7 @@ const MailerSettingsMailer = ({ settings, updateSetting, updateMultipleSettings,
             type='submit'
             style='success'
             extraClass='uk-float-right'
-            disabled={!getSetting('mailerEnabled')}
+            disabled={locked}
             waves
             flat
           />

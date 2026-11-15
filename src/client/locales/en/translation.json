@@ -578,6 +578,7 @@
     "rebuildingIndex": "Rebuilding Index...",
     "mailerTitle": "Mailer",
     "mailerHint": "Preferences for trudesk to send email notifications to users.",
+    "mailerEnvManaged": "Mail sending is configured through the server environment (SMTP_* in .env), so these fields are locked. The test button checks the active connection.",
     "enabled": "Enabled",
     "useSSL": "Use SSLv3",
     "mailServer": "Mail Server",
