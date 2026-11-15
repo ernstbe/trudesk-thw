@@ -9,15 +9,10 @@
  ========================================================================
 */
 
-const async = require('async')
-const axios = require('axios')
 const cron = require('node-cron')
 const winston = require('../logger')
 const TicketSchema = require('../models/ticket')
 const userSchema = require('../models/user')
-const groupSchema = require('../models/group')
-const conversationSchema = require('../models/chat/conversation')
-const settingSchema = require('../models/setting')
 const RecurringTask = require('../models/recurringTask')
 const StatusSchema = require('../models/ticketStatus')
 const sanitizeHtml = require('sanitize-html')
@@ -134,101 +129,6 @@ taskRunner.createTicketFromRecurringTask = async function (task) {
   }
 
   return saved
-}
-
-taskRunner.sendStats = function (callback) {
-  settingSchema.getSettingsByName(['gen:installid', 'gen:version', 'gen:siteurl'], function (err, settings) {
-    if (err) return callback(err)
-    if (!settings || settings.length < 1) return callback()
-
-    let versionSetting = settings.find(function (x) {
-      return x.name === 'gen:version'
-    })
-    const installIdSetting = settings.find(function (x) {
-      return x.name === 'gen:installid'
-    })
-
-    let hostnameSetting = settings.find(function (x) {
-      return x.name === 'gen:siteurl'
-    })
-
-    if (!installIdSetting) return callback()
-
-    versionSetting = versionSetting === undefined ? { value: '--' } : versionSetting
-
-    hostnameSetting = hostnameSetting === undefined ? { value: '--' } : hostnameSetting
-
-    const result = {
-      ticketCount: 0,
-      agentCount: 0,
-      customerGroupCount: 0,
-      conversationCount: 0
-    }
-
-    async.parallel(
-      [
-        async function (done) {
-          try {
-            const count = await TicketSchema.countDocuments({ deleted: false })
-            result.ticketCount = count
-            return done()
-          } catch (err) {
-            return done(err)
-          }
-        },
-        function (done) {
-          userSchema.getAgents({}, function (err, agents) {
-            if (err) return done(err)
-
-            if (!agents) return done()
-            result.agentCount = agents.length
-
-            return done()
-          })
-        },
-        async function (done) {
-          try {
-            const count = await groupSchema.countDocuments({})
-            result.customerGroupCount = count
-            return done()
-          } catch (err) {
-            return done(err)
-          }
-        },
-        async function (done) {
-          try {
-            const count = await conversationSchema.countDocuments({})
-            result.conversationCount = count
-            return done()
-          } catch (err) {
-            return done(err)
-          }
-        }
-      ],
-      function (err) {
-        // if (typeof callback === 'function') return callback()
-        // return
-        if (err) return callback()
-        axios
-          .post('https://stats.trudesk.app/api/v1/installation', {
-            statsKey: 'trudesk',
-            id: installIdSetting.value,
-            version: versionSetting.value,
-            hostname: hostnameSetting.value,
-            ticketCount: result.ticketCount,
-            agentCount: result.agentCount,
-            customerGroupCount: result.customerGroupCount,
-            conversationCount: result.conversationCount
-          })
-          .then(function () {
-            callback()
-          })
-          .catch(function () {
-            callback()
-          })
-      }
-    )
-  })
 }
 
 module.exports = taskRunner
