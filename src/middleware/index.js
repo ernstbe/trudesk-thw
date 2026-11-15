@@ -30,6 +30,9 @@ const session = require('express-session')
 const MongoStore = require('connect-mongo').default || require('connect-mongo').MongoStore
 const passportConfig = require('../passport')()
 
+const ANONYMOUS_SESSION_MAX_AGE = 1000 * 60 * 60 * 24 // 1 day
+const NO_CSRF_SECRET_PATHS = new Set(['/healthz', '/version', '/login'])
+
 let middleware = {}
 
 module.exports = function (app, db, callback) {
@@ -109,13 +112,33 @@ module.exports = function (app, db, callback) {
       function (store, next) {
         app.use(passportConfig.initialize())
         app.use(passportConfig.session())
+
+        // Anonymous sessions only carry a CSRF secret / flash message for the
+        // login form, so they don't need the 1-year cookie lifetime. Without
+        // this, every cookie-less request (uptime monitors, bots) left a
+        // session in MongoDB for a year: 570k+ of them in production. Logging
+        // in regenerates the session (passport >= 0.6), so authenticated
+        // sessions still get the full maxAge configured above.
+        app.use(function (req, res, next) {
+          if (!req.user && req.session && req.session.cookie) {
+            req.session.cookie.maxAge = ANONYMOUS_SESSION_MAX_AGE
+          }
+          return next()
+        })
+
         app.use(flash())
 
         // CORS
         app.use(allowCrossDomain)
         const csrf = require('../dependencies/csrf-td')
         csrf.init()
-        app.use(csrf.generateToken)
+        // Health checks and the bare GET /login redirect never render a form,
+        // so they must not mint a CSRF secret: that write is what creates a
+        // new session for every monitor poll.
+        app.use(function (req, res, next) {
+          if (req.method === 'GET' && NO_CSRF_SECRET_PATHS.has(req.path)) return next()
+          return csrf.generateToken(req, res, next)
+        })
 
         // Maintenance Mode
         app.use(function (req, res, next) {
