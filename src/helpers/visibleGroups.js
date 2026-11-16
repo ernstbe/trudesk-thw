@@ -70,4 +70,40 @@ async function mergeOwnPrivateGroup (groups, userId) {
   return alreadyIncluded ? groups : groups.concat(ownPrivate)
 }
 
-module.exports = { resolveVisibleGroups, assertTicketGroupVisible, mergeOwnPrivateGroup }
+// -------------------------------------------------------------------
+// Assignee gate: every account set as (additional) assignee must itself be
+// able to see the ticket's group — otherwise a user from another team could
+// hand a ticket to someone who can't even open it (and the notification /
+// subscriber fan-out would leak the ticket across the Jugend/Stab boundary).
+// "Can see" is exactly resolveVisibleGroups, so assignability and read
+// access can never drift apart. Throws a 403-tagged error naming the
+// offending account; `statusCode` serves the v2 handlers, `status` the v1
+// create handler. Unknown/deleted accounts are rejected the same way.
+// -------------------------------------------------------------------
+async function assertUsersCanAccessGroup (userIds, groupId) {
+  if (!groupId) return
+  const ids = [...new Set((userIds || []).filter(Boolean).map(id => (id._id || id).toString()))]
+  if (ids.length === 0) return
+
+  const User = require('../models/user')
+  const gid = (groupId._id || groupId).toString()
+  const users = await User.find({ _id: { $in: ids }, deleted: false })
+
+  for (const id of ids) {
+    const user = users.find(u => u._id.toString() === id)
+    let allowed = false
+    if (user && user.role) {
+      const visible = (await resolveVisibleGroups(user)).map(g => g.toString())
+      allowed = visible.includes(gid)
+    }
+    if (!allowed) {
+      const name = user && user.fullname ? user.fullname : id
+      const err = new Error('Forbidden: ' + name + ' has no access to the ticket group')
+      err.statusCode = 403
+      err.status = 403
+      throw err
+    }
+  }
+}
+
+module.exports = { resolveVisibleGroups, assertTicketGroupVisible, mergeOwnPrivateGroup, assertUsersCanAccessGroup }

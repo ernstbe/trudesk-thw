@@ -133,6 +133,15 @@ async function applyTicketUpdate (ticket, reqTicket, user) {
       }
     } else {
       const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
+      const requestedAssigneeId = (reqTicket.assignee._id || reqTicket.assignee).toString()
+      // A changed assignee must be able to see the ticket's group (checked
+      // after a group move in the same payload has been applied above).
+      // Re-sending the current assignee stays allowed so unrelated edits
+      // don't fail on tickets whose assignee has since lost access.
+      if (requestedAssigneeId !== previousAssigneeId) {
+        const { assertUsersCanAccessGroup } = require('../../helpers/visibleGroups')
+        await assertUsersCanAccessGroup([requestedAssigneeId], ticket.group)
+      }
       ticket.assignee = reqTicket.assignee._id || reqTicket.assignee
       await ticket.populate('assignee')
 

@@ -34,6 +34,10 @@ describe('assignment notifications (PUT /api/v1/tickets/:id assignee)', function
     })
 
     const group = await groupSchema.getGroupByName('TEST')
+    // Assignees must be able to see the ticket's group (direct membership
+    // for non-agents).
+    group.members.push(assignee._id)
+    await group.save()
     const type = await tickettype.getTypeByName('Task')
     let priority = await prioritySchema.findOne({ default: true })
     if (!priority) priority = await prioritySchema.findOne({})
@@ -55,6 +59,7 @@ describe('assignment notifications (PUT /api/v1/tickets/:id assignee)', function
   after(async function () {
     try { await ticketSchema.deleteOne({ _id: ticketId }) } catch (_) { /* gone */ }
     try { await notificationSchema.deleteMany({ owner: assignee._id }) } catch (_) { /* gone */ }
+    try { await groupSchema.updateOne({ name: 'TEST' }, { $pull: { members: assignee._id } }) } catch (_) { /* gone */ }
     try { await userSchema.deleteOne({ _id: assignee._id }) } catch (_) { /* gone */ }
   })
 

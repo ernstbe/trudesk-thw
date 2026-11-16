@@ -270,12 +270,18 @@ ticketSchema.methods.setAssignee = async function (ownerId, userId) {
   if (userId === undefined) throw new Error('Invalid User Id')
   const permissions = require('../permissions')
 
-  this.assignee = userId
   const user = await userSchema.getUser(userId)
+  if (!user) throw new Error('Invalid User Id')
 
   if (!permissions.canThis(user.role, 'tickets:update') && !permissions.canThis(user.role, 'agent:*')) {
     throw new Error('User does not have permission to be set as an assignee.')
   }
+
+  // The assignee must be able to open the ticket (same group gate as reads).
+  const { assertUsersCanAccessGroup } = require('../helpers/visibleGroups')
+  await assertUsersCanAccessGroup([userId], this.group)
+
+  this.assignee = userId
 
   const historyItem = {
     action: 'ticket:set:assignee',
@@ -321,6 +327,14 @@ ticketSchema.methods.clearAssignee = function (ownerId) {
  */
 ticketSchema.methods.setAdditionalAssignees = async function (ownerId, userIds) {
   if (!Array.isArray(userIds)) throw new Error('Invalid User Ids')
+
+  // Only newly added accounts are checked, so removing someone (or saving an
+  // unchanged list) still works on a ticket whose existing additional
+  // assignee has since lost access to the group.
+  const current = (this.additionalAssignees || []).map(u => (u._id || u).toString())
+  const added = userIds.map(String).filter(id => !current.includes(id))
+  const { assertUsersCanAccessGroup } = require('../helpers/visibleGroups')
+  await assertUsersCanAccessGroup(added, this.group)
 
   this.additionalAssignees = userIds
 
