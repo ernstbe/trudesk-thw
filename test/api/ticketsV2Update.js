@@ -75,6 +75,9 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
       role: restrictedRole._id,
       accessToken: 'v2update-restricted-token'
     })
+    // It is also used as an additional assignee, which requires access to
+    // the ticket's group (direct membership for non-agents).
+    await groupSchema.updateOne({ name: 'TEST' }, { $push: { members: restrictedUser._id } })
 
     // Fixture ticket via the v1 create endpoint
     const type = await tickettype.getTypeByName('Task')
@@ -109,6 +112,7 @@ describe('api/v2/tickets PUT /:uid (update)', function () {
 
   after(async function () {
     if (ticketId) await ticketModel.deleteOne({ _id: ticketId })
+    if (restrictedUser) await groupSchema.updateOne({ name: 'TEST' }, { $pull: { members: restrictedUser._id } })
     if (secondGroup) {
       const departmentSchema = require('../../src/models/department')
       await departmentSchema.updateOne({ name: 'TEST Department' }, { $pull: { groups: secondGroup._id } })

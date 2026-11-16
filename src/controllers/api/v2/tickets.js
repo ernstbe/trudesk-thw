@@ -24,7 +24,7 @@ const ticketStatusSchema = require('../../../models/ticketStatus')
 const { getDeadlineStatus } = require('../../../helpers/deadlineHelper')
 const { resolveDefaultTicketStatus } = require('../../../helpers/defaultTicketStatus')
 const { parseChecklistField } = require('./checklistParser')
-const { resolveVisibleGroups, assertTicketGroupVisible } = require('../../../helpers/visibleGroups')
+const { resolveVisibleGroups, assertTicketGroupVisible, assertUsersCanAccessGroup } = require('../../../helpers/visibleGroups')
 
 const ticketsV2 = {}
 
@@ -128,6 +128,7 @@ ticketsV2.create = async function (req, res) {
     ticket.subscribers = [user._id]
 
     if (assigneeId) {
+      await assertUsersCanAccessGroup([assigneeId], ticket.group)
       ticket.assignee = assigneeId
       ticket.history.push({
         action: 'ticket:set:assignee',
@@ -163,6 +164,7 @@ ticketsV2.create = async function (req, res) {
 
     return apiUtils.sendApiSuccess(res, { ticket: populated })
   } catch (err) {
+    if (err.statusCode === 403) return apiUtils.sendApiError(res, 403, err.message)
     logger.warn(err)
     return apiUtils.sendApiError(res, 500, err.message || err)
   }
@@ -400,6 +402,9 @@ ticketsV2.batchUpdate = async function (req, res) {
 
       if (batchTicket.assignee !== undefined) {
         const previousAssigneeId = ticket.assignee ? (ticket.assignee._id || ticket.assignee).toString() : null
+        if (batchTicket.assignee && batchTicket.assignee.toString() !== previousAssigneeId) {
+          await assertUsersCanAccessGroup([batchTicket.assignee], ticket.group)
+        }
         ticket.assignee = batchTicket.assignee || undefined
         ticket.history.push({
           action: 'ticket:set:assignee',

@@ -468,6 +468,14 @@ apiTickets.create = async function (req, res) {
     ticket.history = [HistoryItem]
     ticket.subscribers = [user._id]
 
+    // Assignees cast straight from the body must still be able to see the
+    // ticket's group (same gate as the dedicated assign endpoints).
+    const { assertUsersCanAccessGroup } = require('../../../helpers/visibleGroups')
+    await assertUsersCanAccessGroup(
+      [ticket.assignee, ...(ticket.additionalAssignees || [])],
+      ticket.group
+    )
+
     const t = await ticket.save()
     const tt = await t.populate('group owner priority')
 
@@ -799,7 +807,7 @@ apiTickets.setAssignee = async function (req, res) {
 
     return res.json({ success: true, error: null, ticket: t })
   } catch (err) {
-    return res.status(400).json({ success: false, error: err.message || err })
+    return res.status(err.statusCode === 403 ? 403 : 400).json({ success: false, error: err.message || err })
   }
 }
 
@@ -906,7 +914,7 @@ apiTickets.setAdditionalAssignees = async function (req, res) {
 
     return res.json({ success: true, error: null, ticket: t })
   } catch (err) {
-    return res.status(400).json({ success: false, error: err.message || err })
+    return res.status(err.statusCode === 403 ? 403 : 400).json({ success: false, error: err.message || err })
   }
 }
 

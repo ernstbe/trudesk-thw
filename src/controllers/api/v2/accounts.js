@@ -474,9 +474,22 @@ accountsApi.get = async function (req, res) {
         return apiUtil.sendApiSuccess(res, { accounts: resAccounts, count: resAccounts.length })
       }
       case 'agents': {
+        // ?group=<id> narrows the list to agents who can see that group —
+        // i.e. exactly the accounts the ticket endpoints accept as
+        // (additional) assignee for a ticket in it. Used by the assignee
+        // pickers so nobody is offered people outside the ticket's teams.
+        const groupFilter = query.group ? query.group.toString() : null
+        if (groupFilter && !require('mongoose').Types.ObjectId.isValid(groupFilter)) {
+          return apiUtil.sendApiError_InvalidPostData(res)
+        }
+        const { resolveVisibleGroups } = require('../../../helpers/visibleGroups')
         const accounts = await User.getAgents(obj)
         const resAccounts = []
         for (const account of accounts) {
+          if (groupFilter) {
+            const visible = (await resolveVisibleGroups(account)).map(g => g.toString())
+            if (!visible.includes(groupFilter)) continue
+          }
           const a = account.toObject()
           const departments = await Department.getUserDepartments(account._id)
           a.departments = departments.map(function (department) {

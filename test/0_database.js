@@ -104,13 +104,15 @@ before(function (done) {
         })
         expect(group).to.be.a('object')
 
-        // Wire the admin into a team→department→group chain so the per-group
+        // Wire the admin (and the support agent) into a team→department→group chain so the per-group
         // access check inside the ticket create handlers (which routes admins
         // through Department.getDepartmentGroupsOfUser) finds the TEST group.
         const teamSchema = require('../src/models/team')
         const team = await teamSchema.create({
           name: 'TEST Team',
-          members: [adminUser._id]
+          // fake.user (support agent) is in the team too, so it can be
+          // assigned to TEST tickets (assignees must be able to see the group).
+          members: [adminUser._id, fakeUser._id]
         })
         expect(team).to.be.a('object')
 
